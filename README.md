@@ -67,7 +67,3 @@ build.cmd
 ## Calibração
 
 Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no `profile.xml` do usuário e **não são alterados pelo código**. O app só os aplica.
-
-## Licença
-
-A definir pelo autor.
