@@ -83,7 +83,7 @@ namespace ColorMatch
         public static string Caminho { get { return Path.Combine(ProfileStore.Dir, "monitores.xml"); } }
 
         // versão do conhecimento guardado: quando sobe, o app repergunta as capabilities
-        public const int VersaoAtual = 3;
+        public const int VersaoAtual = 4;
 
         static XmlSerializer _ser = new XmlSerializer(typeof(List<MonitorEntry>));
 

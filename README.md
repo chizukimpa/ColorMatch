@@ -39,7 +39,15 @@ Gera `ColorMatch.exe` na pasta do projeto. O script usa o `csc.exe` nativo do Wi
 
 Fechar (X) minimiza para a bandeja; o botão de energia encerra de vez.
 
-## Autostart
+## Instalador
+
+Para distribuir, gere o instalador:
+
+```bat
+build_installer.cmd
+```
+
+Gera `ColorMatchSetup.exe`, que instala em `%LOCALAPPDATA%\ColorMatch` (sem UAC), cria atalho no Menu Iniciar, registra autostart e desinstalador.
 
 O próprio app cria a entrada no registro (`HKCU\...\Run`) com `/invisivel`, sem UAC.
 
