@@ -1,0 +1,27 @@
+# Build output
+ColorMatch.exe
+*.exe
+*.pdb
+*.dll
+
+# User data (never commit — lives in %APPDATA%\ColorMatch)
+profile.xml
+monitores.xml
+*.log
+
+# Editor / OS
+.vs/
+bin/
+obj/
+*.user
+Thumbs.db
+desktop.ini
+
+# Screenshots / captures
+*.png
+!src/app_preview.png
+">
+# dev artifacts
+*.lnk
+diag.txt
+
