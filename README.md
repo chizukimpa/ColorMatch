@@ -25,6 +25,10 @@ Desenvolvido para rodar **100% invisível** (sem ícone na bandeja) e **sem UAC/
 - **Perfis por monitor** (`%APPDATA%\ColorMatch\profile.xml`): calibração não é alterada,
   e valores extras (controles OSD) são salvos e reaplicados.
 - **Reordenar cartões** arrastando o cabeçalho; a ordem fica salva no perfil.
+- **Preset "Generic RGB (macOS)"**: aproxima o visual do perfil *Generic RGB* do macOS
+  (gamma efetivo ~1.8, DDC neutro), útil para quem gosta daquele look.
+- **Iniciar com o Windows**: entrada em `HKCU\...\Run` com `/invisivel`, sem UAC, e
+  reparada automaticamente se sumir (flag `AutoStart` no perfil).
 - **Janela auto-dimensionada** para N monitores (rola se não couber na tela).
 - Ícone próprio, UI arredondada (estilo macOS/One UI), tema escuro.
 
@@ -95,7 +99,3 @@ src/
 build.cmd
 build_installer.cmd
 ```
-
-## Licença
-
-Sem licença definida.

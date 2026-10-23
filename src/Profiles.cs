@@ -63,6 +63,7 @@ namespace ColorMatch
         public string Name = "Perfil";
         public bool UseSoftwareCurve = true;
         public bool InvisibleMode = false;   // sem ícone na bandeja (rodar 100% invisível)
+        public bool AutoStart = false;       // inicia junto com o Windows (repara a entrada do registro se sumir)
         public List<MonitorCal> Monitors = new List<MonitorCal>();
 
         // chave estável do monitor, sem o sufixo de instância ("MONITOR\AOCB501\{...}\0002" -> "MONITOR\AOCB501\{...}")

@@ -758,7 +758,8 @@ namespace ColorMatch
         Profile prof;
         List<DisplayScreen> displays;
         List<MonitorPanel> panels = new List<MonitorPanel>();
-        ComboBox cboRef;
+        SelectBox selRef;
+        int _refIdx = -1;
         ModernToggle chkAuto;
         NotifyIcon tray;
         Label _status;
@@ -952,7 +953,12 @@ namespace ColorMatch
             _bar.Location = new Point(0, 60);
             _bar.Width = w;
             _bar.Height = _bar.GetPreferredSize(new Size(w, 0)).Height;
-            int top = 60 + _bar.Height;
+            if (_status != null)
+            {
+                _status.Bounds = new Rectangle(16, 60 + _bar.Height + 2, Math.Max(100, w - 32), 22);
+                _status.BringToFront();
+            }
+            int top = 60 + _bar.Height + 24;
             _flow.Bounds = new Rectangle(0, top, w, Math.Max(0, ClientSize.Height - top));
         }
 
@@ -1032,73 +1038,106 @@ namespace ColorMatch
                 return b;
             };
 
-            cboRef = new ComboBox();
-            cboRef.Width = 236;
-            cboRef.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboRef.BackColor = Theme.Card2; cboRef.ForeColor = Theme.Text;
-            cboRef.FlatStyle = FlatStyle.Flat;
-            cboRef.Font = Theme.F(9.25f);
-            cboRef.DrawMode = DrawMode.OwnerDrawFixed;
-            cboRef.ItemHeight = 24;
-            cboRef.Margin = new Padding(3, 5, 9, 4);
-            cboRef.DrawItem += (s, e) =>
+            // separador fino entre os grupos da barra
+            Func<Control> sep = () =>
             {
-                var bg = (e.State & DrawItemState.Selected) != 0 ? Theme.Accent : Theme.Card2;
-                using (var b = new SolidBrush(bg)) e.Graphics.FillRectangle(b, e.Bounds);
-                if (e.Index >= 0)
-                    TextRenderer.DrawText(e.Graphics, cboRef.Items[e.Index].ToString(), e.Font,
-                        new Rectangle(e.Bounds.X + 8, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height),
-                        Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                var p = new Panel();
+                p.Width = 1; p.Height = 22;
+                p.BackColor = Theme.Border;
+                p.Margin = new Padding(9, 10, 9, 4);
+                return p;
             };
-            foreach (var d in displays) cboRef.Items.Add(d.ToString());
-            if (displays.Any(d => d.Primary)) cboRef.SelectedIndex = displays.FindIndex(d => d.Primary);
-            tb.Controls.Add(cboRef);
 
-            var bEqualize = btn("Copiar DDC", 116);
+            // quebra de linha explícita: mantém cada grupo inteiro na mesma linha
+            Func<Control> quebra = () =>
+            {
+                var p = new Panel();
+                p.Width = 4000; p.Height = 0;
+                p.Margin = new Padding(0);
+                p.BackColor = Theme.Bg;
+                return p;
+            };
+
+            // grupo 1: igualar os monitores (copiar o DDC de um para os outros)
+            var lblRef = new Label();
+            lblRef.Text = "Copiar DDC de";
+            lblRef.AutoSize = false;
+            lblRef.Size = new Size(104, 34);
+            lblRef.TextAlign = ContentAlignment.MiddleLeft;
+            lblRef.Font = Theme.F(8.75f);
+            lblRef.ForeColor = Theme.Muted;
+            lblRef.BackColor = Theme.Bg;
+            lblRef.Margin = new Padding(3, 4, 2, 4);
+            tb.Controls.Add(lblRef);
+
+            selRef = new SelectBox();
+            selRef.Width = 232; selRef.Height = 34;
+            selRef.Margin = new Padding(0, 4, 6, 4);
+            selRef.Click += (s, e) => AbrirRefMenu();
+            tb.Controls.Add(selRef);
+
+            var bEqualize = btn("Copiar p/ os outros", 172);
             bEqualize.Click += (s, e) => EqualizeDdc();
             tb.Controls.Add(bEqualize);
 
-            var bMac = btn("Preset neutro", 124);
-            bMac.Click += (s, e) => MacPreset();
-            tb.Controls.Add(bMac);
+            tb.Controls.Add(sep());
 
-            var bGeneric = btn("Generic RGB", 118);
-            bGeneric.Click += (s, e) => GenericRgbPreset();
-            tb.Controls.Add(bGeneric);
-
-            var bSave = btn("Salvar perfil", 120);
+            // grupo 2: perfil salvo
+            var bSave = btn("Salvar perfil", 124);
             bSave.Accent = true;
             bSave.Click += (s, e) => { SaveProfile(true); };
             tb.Controls.Add(bSave);
 
-            var bRestore = btn("Ler atual", 108);
+            var bRestore = btn("Ler do monitor", 140);
             bRestore.Click += (s, e) => { ReloadFromHardware(); };
             tb.Controls.Add(bRestore);
 
-            var bApplySaved = btn("Reaplicar", 116);
+            var bApplySaved = btn("Reaplicar perfil", 148);
             bApplySaved.Click += (s, e) => { ApplySavedNow(); };
             tb.Controls.Add(bApplySaved);
 
-            var bCmp = btn("Cinza nos dois", 124);
+            tb.Controls.Add(quebra());
+
+            // grupo 3: presets de aparência
+            var bMac = btn("Neutro", 88);
+            bMac.Click += (s, e) => MacPreset();
+            tb.Controls.Add(bMac);
+
+            var bGeneric = btn("Generic RGB (macOS)", 170);
+            bGeneric.Click += (s, e) => GenericRgbPreset();
+            tb.Controls.Add(bGeneric);
+
+            tb.Controls.Add(sep());
+
+            // grupo 4: padrões de teste
+            var bCmp = btn("Cinza nos dois", 132);
             bCmp.Click += (s, e) => ShowCompare(PatternKind.Gray50);
             tb.Controls.Add(bCmp);
 
-            var bFechar = btn("Fechar testes", 110);
+            var bFechar = btn("Fechar testes", 124);
             bFechar.Click += (s, e) => PatternForm.CloseAll();
             tb.Controls.Add(bFechar);
 
+            tb.Controls.Add(sep());
+
+            // grupo 5: sistema
             chkAuto = new ModernToggle();
-            chkAuto.Caption = "Aplicar sempre (inicia com o Windows)";
-            chkAuto.Width = 300;
+            chkAuto.Caption = "Iniciar com o Windows";
+            chkAuto.Width = 216;
             chkAuto.BackColor = Theme.Bg;
-            chkAuto.Margin = new Padding(3, 8, 9, 4);
-            chkAuto.Checked = IsAutoStart();
-            chkAuto.CheckedChanged += (s, e) => SetAutoStart(chkAuto.Checked);
+            chkAuto.Margin = new Padding(3, 8, 6, 4);
+            chkAuto.CheckedChanged += (s, e) =>
+            {
+                prof.AutoStart = chkAuto.Checked;
+                try { ProfileStore.Save(prof); } catch { }
+                SetAutoStart(chkAuto.Checked);
+            };
+            chkAuto.Checked = IsAutoStart() || prof.AutoStart;
             tb.Controls.Add(chkAuto);
 
             chkTray = new ModernToggle();
-            chkTray.Caption = "Rodar invisível (sem ícone na bandeja)";
-            chkTray.Width = 280;
+            chkTray.Caption = "Rodar invisível";
+            chkTray.Width = 188;
             chkTray.BackColor = Theme.Bg;
             chkTray.Margin = new Padding(3, 8, 9, 4);
             chkTray.Checked = prof.InvisibleMode;
@@ -1106,15 +1145,19 @@ namespace ColorMatch
             tb.Controls.Add(chkTray);
 
             _status = new Label();
-            _status.Text = "Salve o perfil quando estiver bom — o vigia devolve a cor se algo apagar.";
+            _status.Text = "Escolha o monitor de referência e use \"Copiar p/ os outros\". \"Salvar perfil\" guarda a calibração.";
             _status.AutoSize = false;
-            _status.Size = new Size(430, 22);
+            _status.Size = new Size(560, 22);
             _status.TextAlign = ContentAlignment.MiddleLeft;
             _status.Font = Theme.F(8.5f);
             _status.ForeColor = Theme.Muted;
             _status.BackColor = Theme.Bg;
             _status.Margin = new Padding(9, 11, 3, 4);
-            tb.Controls.Add(_status);
+            Controls.Add(_status);
+
+            _refIdx = displays.FindIndex(d => d.Primary);
+            if (_refIdx < 0 && displays.Count > 0) _refIdx = 0;
+            AtualizarRefTexto();
 
             // ---- vigia: garante que a cor não se perca ----
             // Verifica a cada minuto se a LUT continua viva no Windows; se algo apagou
@@ -1382,14 +1425,50 @@ namespace ColorMatch
             if (m != null) m.Invoke(p, null);
         }
 
+        // monta o menu escuro com a lista de monitores para o "Copiar DDC de"
+        void AbrirRefMenu()
+        {
+            if (displays == null || displays.Count == 0) return;
+            var m = new ContextMenuStrip();
+            m.Renderer = new ToolStripProfessionalRenderer(new MenuCores());
+            m.ShowImageMargin = false;
+            m.BackColor = Theme.Card2;
+            m.ForeColor = Theme.Text;
+            m.Font = Theme.F(9.5f);
+            m.Padding = new Padding(4);
+            m.MinimumSize = new Size(selRef.Width, 0);
+            for (int i = 0; i < displays.Count; i++)
+            {
+                int idx = i;
+                var it = new ToolStripMenuItem(displays[i].ToString());
+                it.BackColor = Theme.Card2;
+                it.ForeColor = Theme.Text;
+                it.Padding = new Padding(8, 5, 8, 5);
+                if (idx == _refIdx) it.Font = new Font(m.Font, FontStyle.Bold);
+                it.Click += (s, e) => { _refIdx = idx; AtualizarRefTexto(); };
+                m.Items.Add(it);
+            }
+            m.Show(selRef, new Point(0, selRef.Height + 2));
+        }
+
+        void AtualizarRefTexto()
+        {
+            if (selRef == null || displays == null || _refIdx < 0 || _refIdx >= displays.Count) return;
+            selRef.Text = displays[_refIdx].ToString();
+            if (_status != null)
+                _status.Text = "Copiar DDC: pega brilho, contraste e ganhos de " + displays[_refIdx].ToString() +
+                    " e aplica nos outros monitores.";
+        }
+
         void EqualizeDdc()
         {
-            int refIdx = cboRef.SelectedIndex;
-            if (refIdx < 0) return;
+            int refIdx = _refIdx;
+            if (refIdx < 0 || displays == null || refIdx >= displays.Count) return;
             var refDs = displays[refIdx];
             var refPanel = panels.FirstOrDefault(p => p.Display == refDs);
             if (refPanel == null) return;
             var rc = refPanel.Cal;
+            int n = 0;
             foreach (var p in panels)
             {
                 if (p.Display == refDs) continue;
@@ -1400,12 +1479,17 @@ namespace ColorMatch
                 p.Cal.BlueGain = rc.BlueGain;
                 p.SyncSliders();
                 CallPrivate(p, "PushDdcAll");
+                n++;
             }
             SaveProfile(false);
+            if (_status != null)
+                _status.Text = "DDC de " + refDs.ToString() + " copiado para " + n + " monitor(es).";
         }
 
         void MacPreset()
         {
+            if (MessageBox.Show("Aplicar o preset NEUTRO?\n\nIsso substitui a calibração atual dos monitores.",
+                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             foreach (var p in panels)
             {
                 p.Cal.Contrast = 50; p.Cal.RedGain = 50; p.Cal.GreenGain = 50; p.Cal.BlueGain = 50;
@@ -1422,21 +1506,26 @@ namespace ColorMatch
                 "\nDepois compare com o pattern '50% cinza' nos dois e refine Realce/Gamma. No fim 'Salvar perfil'.");
         }
 
-        // Preset inspirado no "Generic RGB Profile" do macOS (gamma ~1.8, neutro):
-        // tenta reproduzir o visual "generic rgb" que o usuário gostou no Hackintosh.
+        // Preset inspirado no "Generic RGB Profile" do macOS (display gamma 1.8, neutro):
+        // como o LUT do app aplica x^(1/g) sobre um monitor ~2.2, o g que resulta em
+        // gamma efetivo 1.8 é 2.2/1.8 ~= 1.22 (e não 1.8, que ficaria lavado demais).
         void GenericRgbPreset()
         {
+            if (MessageBox.Show("Aplicar o preset GENERIC RGB (macOS)?\n\n" +
+                "Gamma efetivo ~1.8 (curva 1.22 no app), DDC neutro e ganhos 1.0 — imita o perfil 'Generic RGB' que você usou no Hackintosh.\n" +
+                "Isso substitui a calibração atual dos monitores.",
+                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             foreach (var p in panels)
             {
                 p.Cal.Contrast = 50; p.Cal.RedGain = 50; p.Cal.GreenGain = 50; p.Cal.BlueGain = 50;
-                p.Cal.Gamma = 1.8; p.Cal.BrightMult = 1.0; p.Cal.BlackLift = 0;
+                p.Cal.Gamma = 2.2 / 1.80078125; p.Cal.BrightMult = 1.0; p.Cal.BlackLift = 0;
                 p.Cal.GainR = p.Cal.GainG = p.Cal.GainB = 1.0;
                 p.SyncSliders();
                 CallPrivate(p, "PushDdcAll");
                 CallPrivate(p, "ApplyCurve");
             }
             SaveProfile(false);
-            MessageBox.Show("Preset 'Generic RGB' aplicado: gamma ~1.8 (estilo Generic RGB do macOS), ganhos neutros.\n" +
+            MessageBox.Show("Preset 'Generic RGB' aplicado: gamma efetivo ~1.8 (curva 1.22), ganhos neutros.\n" +
                 "Refine Realce/Gamma se precisar e 'Salvar perfil'.",
                 "ColorMatch", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -1733,7 +1822,7 @@ namespace ColorMatch
             if (24 + cols * cardW + 24 > maxW) cols = Math.Max(1, (maxW - 48) / cardW);
             int rows = (panels.Count + cols - 1) / cols;
             int needW = 48 + cols * cardW;
-            int needH = 60 + _bar.GetPreferredSize(new Size(needW, 0)).Height + 22 + rows * cardH;
+            int needH = 60 + _bar.GetPreferredSize(new Size(needW, 0)).Height + 26 + rows * cardH;
             if (needW > wa.Width - 20) needW = wa.Width - 20;
             if (needH > wa.Height - 20) needH = wa.Height - 20;
             if (needW < 1030) needW = 1030;
