@@ -84,9 +84,9 @@ namespace ColorMatch
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_GREEN_GAIN, (uint)c.GreenGain);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BLUE_GAIN, (uint)c.BlueGain);
-                    if (prof.UseSoftwareCurve)
-                        Win.WriteRamp(ds.DeviceName, Win.BuildRamp(c.Gamma, c.BrightMult, c.BlackLift, c.GainR, c.GainG, c.GainB));
-                    ProfileStore.Log("aplicado: " + ds.DeviceName + " (" + ds.FriendlyName + ")");
+                    bool rampOk = Win.WriteRamp(ds.DeviceName, Win.BuildRamp(c.Gamma, c.BrightMult, c.BlackLift, c.GainR, c.GainG, c.GainB));
+                    ProfileStore.Log("aplicado: " + ds.DeviceName + " (" + ds.FriendlyName + ")" +
+                        (rampOk ? " LUT ok" : " FALHA LUT"));
                 }
                 catch (Exception e) { ProfileStore.Log("erro ao aplicar " + ds.DeviceName + ": " + e.Message); }
             }
@@ -566,8 +566,8 @@ namespace ColorMatch
             var ramp = Win.BuildRamp(Cal.Gamma, Cal.BrightMult, Cal.BlackLift, Cal.GainR, Cal.GainG, Cal.GainB);
             bool ok = Win.WriteRamp(Display.DeviceName, ramp);
             var got = Win.ReadRamp(Display.DeviceName);
-            if (!ok || got == null) _st.Text = "Falha na aplicação da LUT.";
-            else _st.Text = "LUT aplicada e confirmada.";
+            if (!ok || got == null) { _st.Text = "Falha na aplicação da LUT."; ProfileStore.Log("FALHA LUT " + Display.DeviceName); }
+            else { _st.Text = "LUT aplicada e confirmada."; }
             _curvePrev.Invalidate();
             _owner.ProfileChanged();
             UpdateValueLabels();
@@ -800,6 +800,14 @@ namespace ColorMatch
 
             if (_startHidden) ShowInTaskbar = false;
             Load += MainForm_Load;
+            Shown += (s, e) =>
+            {
+                // re-aplica após a janela aparecer (DWM pode ter resetado a LUT na inicialização)
+                var t = new System.Windows.Forms.Timer();
+                t.Interval = 1500;
+                t.Tick += (x, y) => { t.Stop(); try { ReapplyAllQuiet("janela exibida"); } catch { } };
+                t.Start();
+            };
         }
 
         // ---- janela sem borda: cantos redondos (DWM) + arrastar/redimensionar ----
@@ -1054,6 +1062,10 @@ namespace ColorMatch
             bMac.Click += (s, e) => MacPreset();
             tb.Controls.Add(bMac);
 
+            var bGeneric = btn("Generic RGB", 118);
+            bGeneric.Click += (s, e) => GenericRgbPreset();
+            tb.Controls.Add(bGeneric);
+
             var bSave = btn("Salvar perfil", 120);
             bSave.Accent = true;
             bSave.Click += (s, e) => { SaveProfile(true); };
@@ -1115,14 +1127,14 @@ namespace ColorMatch
             // depois de trocar modo (Win+P), ligar monitor ou logar, o driver reseta a LUT alguns
             // segundos depois — então recheca varias vezes nesses primeiros 20s
             _settle = new System.Windows.Forms.Timer();
-            _settle.Interval = 2500;
+            _settle.Interval = 1000;
             _settle.Tick += (s, e) =>
             {
                 if (_settleLeft <= 0) { _settle.Stop(); return; }
                 _settleLeft--;
                 ReapplyAllQuiet("ajuste pós-mudança de tela");
             };
-            _settleLeft = 8;
+            _settleLeft = 20;
             _settle.Start();
             try
             {
@@ -1408,6 +1420,25 @@ namespace ColorMatch
                 " AOC: HDR=Off, Color Space=sRGB, Color Temp=Neutral, Eco=Off, DCR=Off\n" +
                 " Acer: Modo sRGB=ON, Temp=Neutro (esta Quente), Aum. de Preto=0 (esta 3), Super Nitidez=OFF (esta ON), ACM=OFF\n" +
                 "\nDepois compare com o pattern '50% cinza' nos dois e refine Realce/Gamma. No fim 'Salvar perfil'.");
+        }
+
+        // Preset inspirado no "Generic RGB Profile" do macOS (gamma ~1.8, neutro):
+        // tenta reproduzir o visual "generic rgb" que o usuário gostou no Hackintosh.
+        void GenericRgbPreset()
+        {
+            foreach (var p in panels)
+            {
+                p.Cal.Contrast = 50; p.Cal.RedGain = 50; p.Cal.GreenGain = 50; p.Cal.BlueGain = 50;
+                p.Cal.Gamma = 1.8; p.Cal.BrightMult = 1.0; p.Cal.BlackLift = 0;
+                p.Cal.GainR = p.Cal.GainG = p.Cal.GainB = 1.0;
+                p.SyncSliders();
+                CallPrivate(p, "PushDdcAll");
+                CallPrivate(p, "ApplyCurve");
+            }
+            SaveProfile(false);
+            MessageBox.Show("Preset 'Generic RGB' aplicado: gamma ~1.8 (estilo Generic RGB do macOS), ganhos neutros.\n" +
+                "Refine Realce/Gamma se precisar e 'Salvar perfil'.",
+                "ColorMatch", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // faixa de cinza na juncao das duas telas, com o app ainda acessivel
