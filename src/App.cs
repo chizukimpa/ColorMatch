@@ -13,6 +13,9 @@ namespace ColorMatch
 
     static class Program
     {
+        // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
+        public const string Versao = "1.1.0";
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -787,7 +790,7 @@ namespace ColorMatch
         {
             _startHidden = startHidden;
             _invisible = invisible;
-            Text = "ColorMatch";
+            Text = "ColorMatch " + Program.Versao;
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
             Size = new Size(1160, 916);
@@ -884,10 +887,10 @@ namespace ColorMatch
             h.Controls.Add(titulo);
 
             var sub = new Label();
-            sub.Text = "todas as telas com a mesma cor";
+            sub.Text = "todas as telas com a mesma cor  ·  v" + Program.Versao;
             sub.AutoSize = false;
             sub.Location = new Point(60, 34);
-            sub.Size = new Size(320, 18);
+            sub.Size = new Size(360, 18);
             sub.Font = Theme.F(8.25f);
             sub.ForeColor = Theme.Muted;
             sub.BackColor = Theme.Bg;

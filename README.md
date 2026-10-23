@@ -2,6 +2,8 @@
 
 > Iguala cor e brilho entre monitores no Windows.
 
+**Versão atual: 1.1.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
+
 ## Sobre
 
 Aplicativo Windows (WinForms) para **colorir monitores iguais** (mesma cor/brilho entre
@@ -85,6 +87,13 @@ O próprio app cria a entrada no registro (`HKCU\...\Run`) com `/invisivel`, sem
 
 Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 `profile.xml` do usuário e **não são alterados pelo código**. O app só os aplica.
+
+## Histórico
+
+- **1.1.0** — barra de comandos agrupada e rotulada; preset "Generic RGB (macOS)" (gamma efetivo 1.8);
+  autostart persistente no perfil e reparado automaticamente; re-aplicação da LUT após exibir a janela;
+  confirmação antes de aplicar presets.
+- **1.0.0** — primeira versão pública.
 
 ## Estrutura
 
