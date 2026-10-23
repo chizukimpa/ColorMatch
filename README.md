@@ -2,7 +2,7 @@
 
 > Iguala cor e brilho entre monitores no Windows.
 
-**Versão atual: 1.1.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
+**Versão atual: 1.2.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
 
 ## Sobre
 
@@ -26,9 +26,14 @@ Desenvolvido para rodar **100% invisível** (sem ícone na bandeja) e **sem UAC/
   monitor aparece — funciona com monitores de qualquer marca.
 - **Perfis por monitor** (`%APPDATA%\ColorMatch\profile.xml`): calibração não é alterada,
   e valores extras (controles OSD) são salvos e reaplicados.
+- **Lista de perfis aplicáveis**: o seletor "Perfil" mostra a calibração atual e todos os
+  perfis salvos (`%APPDATA%\ColorMatch\perfis\`). "+ Novo perfil" cria um snapshot na hora
+  e ele já aparece na lista; dá para aplicar, renomear e excluir.
+- **Perfis do macOS na mesma lista**: sRGB IEC61966-2.1, Display P3, Adobe RGB (1998),
+  Apple RGB, Generic RGB, Generic Gray 2.2, Generic Gray e ProPhoto RGB. Aplicam **só a
+  curva de gamma** (o que uma LUT por canal reproduz); brilho/contraste/ganhos calibrados
+  são mantidos.
 - **Reordenar cartões** arrastando o cabeçalho; a ordem fica salva no perfil.
-- **Preset "Generic RGB (macOS)"**: aproxima o visual do perfil *Generic RGB* do macOS
-  (gamma efetivo ~1.8, DDC neutro), útil para quem gosta daquele look.
 - **Iniciar com o Windows**: entrada em `HKCU\...\Run` com `/invisivel`, sem UAC, e
   reparada automaticamente se sumir (flag `AutoStart` no perfil).
 - **Janela auto-dimensionada** para N monitores (rola se não couber na tela).
@@ -90,6 +95,8 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 
 ## Histórico
 
+- **1.2.0** — lista de perfis aplicáveis (criar/aplicar/renomear/excluir) com os perfis do
+  macOS na mesma lista; aplicar perfil do macOS muda só a curva e preserva a calibração.
 - **1.1.0** — barra de comandos agrupada e rotulada; preset "Generic RGB (macOS)" (gamma efetivo 1.8);
   autostart persistente no perfil e reparado automaticamente; re-aplicação da LUT após exibir a janela;
   confirmação antes de aplicar presets.

@@ -47,6 +47,19 @@ namespace ColorMatch
             return -1;
         }
 
+        // copia só os valores de calibração (não mexe em MonitorId/DeviceName/Ordem)
+        public void CopyValuesFrom(MonitorCal c)
+        {
+            if (c == null) return;
+            Brightness = c.Brightness; Contrast = c.Contrast;
+            RedGain = c.RedGain; GreenGain = c.GreenGain; BlueGain = c.BlueGain;
+            Gamma = c.Gamma; BrightMult = c.BrightMult; BlackLift = c.BlackLift;
+            GainR = c.GainR; GainG = c.GainG; GainB = c.GainB;
+            Extras = new List<VcpValor>();
+            if (c.Extras != null)
+                foreach (var v in c.Extras) Extras.Add(new VcpValor(v.Codigo, v.Valor));
+        }
+
         public void SetExtra(byte code, int valor)
         {
             if (Extras == null) Extras = new List<VcpValor>();
@@ -61,10 +74,52 @@ namespace ColorMatch
     public class Profile
     {
         public string Name = "Perfil";
+        public string Id = "";               // "" = perfil de trabalho (profile.xml); senão é um perfil da biblioteca
         public bool UseSoftwareCurve = true;
         public bool InvisibleMode = false;   // sem ícone na bandeja (rodar 100% invisível)
         public bool AutoStart = false;       // inicia junto com o Windows (repara a entrada do registro se sumir)
         public List<MonitorCal> Monitors = new List<MonitorCal>();
+
+        // cópia independente (usada em "salvar como novo perfil")
+        public Profile Clone()
+        {
+            var n = new Profile();
+            n.Name = Name; n.Id = Id; n.UseSoftwareCurve = UseSoftwareCurve;
+            n.InvisibleMode = InvisibleMode; n.AutoStart = AutoStart;
+            n.Monitors = new List<MonitorCal>();
+            foreach (var m in Monitors)
+            {
+                var c = new MonitorCal();
+                c.MonitorId = m.MonitorId; c.DeviceName = m.DeviceName; c.FriendlyName = m.FriendlyName;
+                c.Ordem = m.Ordem;
+                c.CopyValuesFrom(m);
+                n.Monitors.Add(c);
+            }
+            return n;
+        }
+
+        // procura a entrada deste monitor SEM criar uma nova (Match != GetByMonitorId)
+        public MonitorCal Match(string monitorId, string deviceName)
+        {
+            if (!string.IsNullOrEmpty(monitorId))
+                foreach (var m in Monitors)
+                    if (m.MonitorId == monitorId) return m;
+
+            string k = HardwareKey(monitorId);
+            if (k != "")
+            {
+                MonitorCal achou = null; int n = 0;
+                foreach (var m in Monitors)
+                    if (HardwareKey(m.MonitorId) == k) { achou = m; n++; }
+                if (n == 1) return achou;
+            }
+
+            if (!string.IsNullOrEmpty(deviceName))
+                foreach (var m in Monitors)
+                    if (m.DeviceName == deviceName) return m;
+
+            return null;
+        }
 
         // chave estável do monitor, sem o sufixo de instância ("MONITOR\AOCB501\{...}\0002" -> "MONITOR\AOCB501\{...}")
         public static string HardwareKey(string monitorId)
@@ -176,6 +231,15 @@ namespace ColorMatch
             }
         }
         public static string ProfilePath { get { return Path.Combine(Dir, "profile.xml"); } }
+        public static string ProfilesDir
+        {
+            get
+            {
+                string p = Path.Combine(Dir, "perfis");
+                if (!Directory.Exists(p)) Directory.CreateDirectory(p);
+                return p;
+            }
+        }
         public static string LogPath { get { return Path.Combine(Dir, "apply.log"); } }
 
         static XmlSerializer Ser = new XmlSerializer(typeof(Profile));
@@ -197,9 +261,76 @@ namespace ColorMatch
                 Ser.Serialize(fs, p);
         }
 
+        public static Profile LoadFrom(string path)
+        {
+            try
+            {
+                using (var fs = File.OpenRead(path))
+                    return (Profile)Ser.Deserialize(fs);
+            }
+            catch { return null; }
+        }
+
+        public static void SaveTo(string path, Profile p)
+        {
+            using (var fs = File.Create(path))
+                Ser.Serialize(fs, p);
+        }
+
         public static void Log(string s)
         {
             try { File.AppendAllText(LogPath, System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") + s + "\r\n"); } catch { }
+        }
+    }
+
+    // biblioteca de perfis salvos pelo usuário (%APPDATA%\ColorMatch\perfis\*.xml)
+    public static class ProfileLibrary
+    {
+        public static List<Profile> List()
+        {
+            var l = new List<Profile>();
+            try
+            {
+                foreach (var f in Directory.GetFiles(ProfileStore.ProfilesDir, "*.xml"))
+                {
+                    var p = ProfileStore.LoadFrom(f);
+                    if (p == null) continue;
+                    if (string.IsNullOrEmpty(p.Id)) p.Id = Path.GetFileNameWithoutExtension(f);
+                    if (string.IsNullOrEmpty(p.Name)) p.Name = "Perfil";
+                    l.Add(p);
+                }
+            }
+            catch { }
+            l.Sort(delegate(Profile a, Profile b)
+            {
+                return string.Compare(a.Name, b.Name, System.StringComparison.CurrentCultureIgnoreCase);
+            });
+            return l;
+        }
+
+        public static Profile FindById(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (var p in List()) if (p.Id == id) return p;
+            return null;
+        }
+
+        public static void Save(Profile p)
+        {
+            if (p == null) return;
+            if (string.IsNullOrEmpty(p.Id)) p.Id = System.Guid.NewGuid().ToString("N");
+            ProfileStore.SaveTo(Path.Combine(ProfileStore.ProfilesDir, p.Id + ".xml"), p);
+        }
+
+        public static void Delete(Profile p)
+        {
+            if (p == null || string.IsNullOrEmpty(p.Id)) return;
+            try
+            {
+                string f = Path.Combine(ProfileStore.ProfilesDir, p.Id + ".xml");
+                if (File.Exists(f)) File.Delete(f);
+            }
+            catch { }
         }
     }
 }

@@ -14,7 +14,7 @@ namespace ColorMatch
     static class Program
     {
         // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
-        public const string Versao = "1.1.0";
+        public const string Versao = "1.2.0";
 
         [STAThread]
         static void Main(string[] args)
@@ -762,6 +762,7 @@ namespace ColorMatch
         List<DisplayScreen> displays;
         List<MonitorPanel> panels = new List<MonitorPanel>();
         SelectBox selRef;
+        SelectBox selPerfil;
         int _refIdx = -1;
         ModernToggle chkAuto;
         NotifyIcon tray;
@@ -1061,7 +1062,46 @@ namespace ColorMatch
                 return p;
             };
 
-            // grupo 1: igualar os monitores (copiar o DDC de um para os outros)
+            // grupo 1: perfil (lista de perfis salvos + ações)
+            var lblPerfil = new Label();
+            lblPerfil.Text = "Perfil";
+            lblPerfil.AutoSize = false;
+            lblPerfil.Size = new Size(52, 34);
+            lblPerfil.TextAlign = ContentAlignment.MiddleLeft;
+            lblPerfil.Font = Theme.F(8.75f);
+            lblPerfil.ForeColor = Theme.Muted;
+            lblPerfil.BackColor = Theme.Bg;
+            lblPerfil.Margin = new Padding(3, 4, 2, 4);
+            tb.Controls.Add(lblPerfil);
+
+            selPerfil = new SelectBox();
+            selPerfil.Width = 250; selPerfil.Height = 34;
+            selPerfil.Margin = new Padding(0, 4, 6, 4);
+            selPerfil.Click += (s, e) => AbrirMenuPerfis();
+            tb.Controls.Add(selPerfil);
+
+            var bNovo = btn("+ Novo perfil", 128);
+            bNovo.Click += (s, e) => SalvarComoNovoPerfil();
+            tb.Controls.Add(bNovo);
+
+            tb.Controls.Add(sep());
+
+            var bSave = btn("Salvar perfil", 124);
+            bSave.Accent = true;
+            bSave.Click += (s, e) => { SaveProfile(true); };
+            tb.Controls.Add(bSave);
+
+            var bRestore = btn("Ler do monitor", 140);
+            bRestore.Click += (s, e) => { ReloadFromHardware(); };
+            tb.Controls.Add(bRestore);
+
+            var bApplySaved = btn("Reaplicar perfil", 148);
+            bApplySaved.Click += (s, e) => { ApplySavedNow(); };
+            tb.Controls.Add(bApplySaved);
+
+            tb.Controls.Add(quebra());
+
+            // grupo 2: igualar os monitores (copiar o DDC de um para os outros)
             var lblRef = new Label();
             lblRef.Text = "Copiar DDC de";
             lblRef.AutoSize = false;
@@ -1085,34 +1125,7 @@ namespace ColorMatch
 
             tb.Controls.Add(sep());
 
-            // grupo 2: perfil salvo
-            var bSave = btn("Salvar perfil", 124);
-            bSave.Accent = true;
-            bSave.Click += (s, e) => { SaveProfile(true); };
-            tb.Controls.Add(bSave);
-
-            var bRestore = btn("Ler do monitor", 140);
-            bRestore.Click += (s, e) => { ReloadFromHardware(); };
-            tb.Controls.Add(bRestore);
-
-            var bApplySaved = btn("Reaplicar perfil", 148);
-            bApplySaved.Click += (s, e) => { ApplySavedNow(); };
-            tb.Controls.Add(bApplySaved);
-
-            tb.Controls.Add(quebra());
-
-            // grupo 3: presets de aparência
-            var bMac = btn("Neutro", 88);
-            bMac.Click += (s, e) => MacPreset();
-            tb.Controls.Add(bMac);
-
-            var bGeneric = btn("Generic RGB (macOS)", 170);
-            bGeneric.Click += (s, e) => GenericRgbPreset();
-            tb.Controls.Add(bGeneric);
-
-            tb.Controls.Add(sep());
-
-            // grupo 4: padrões de teste
+            // grupo 3: padrões de teste
             var bCmp = btn("Cinza nos dois", 132);
             bCmp.Click += (s, e) => ShowCompare(PatternKind.Gray50);
             tb.Controls.Add(bCmp);
@@ -1121,9 +1134,9 @@ namespace ColorMatch
             bFechar.Click += (s, e) => PatternForm.CloseAll();
             tb.Controls.Add(bFechar);
 
-            tb.Controls.Add(sep());
+            tb.Controls.Add(quebra());
 
-            // grupo 5: sistema
+            // grupo 4: sistema
             chkAuto = new ModernToggle();
             chkAuto.Caption = "Iniciar com o Windows";
             chkAuto.Width = 216;
@@ -1161,6 +1174,7 @@ namespace ColorMatch
             _refIdx = displays.FindIndex(d => d.Primary);
             if (_refIdx < 0 && displays.Count > 0) _refIdx = 0;
             AtualizarRefTexto();
+            AtualizarPerfilTexto(false);
 
             // ---- vigia: garante que a cor não se perca ----
             // Verifica a cada minuto se a LUT continua viva no Windows; se algo apagou
@@ -1489,48 +1503,232 @@ namespace ColorMatch
                 _status.Text = "DDC de " + refDs.ToString() + " copiado para " + n + " monitor(es).";
         }
 
-        void MacPreset()
+        // ---------- perfis: lista, criação, aplicação ----------
+
+        void AtualizarPerfilTexto(bool mexerStatus)
         {
-            if (MessageBox.Show("Aplicar o preset NEUTRO?\n\nIsso substitui a calibração atual dos monitores.",
-                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-            foreach (var p in panels)
-            {
-                p.Cal.Contrast = 50; p.Cal.RedGain = 50; p.Cal.GreenGain = 50; p.Cal.BlueGain = 50;
-                p.Cal.Gamma = 1.0; p.Cal.BrightMult = 1.0; p.Cal.BlackLift = 0; p.Cal.GainR = p.Cal.GainG = p.Cal.GainB = 1.0;
-                p.SyncSliders();
-                CallPrivate(p, "PushDdcAll");
-                CallPrivate(p, "ApplyCurve");
-            }
-            SaveProfile(false);
-            MessageBox.Show("Preset neutro aplicado: contraste/ganhos DDC em 50, curva de gamma identica (o OSD dos monitores ja cuida do gamma 2.2 e sRGB).\n\n" +
-                "Antes de refinar, confira no menu dos monitores:\n" +
-                " AOC: HDR=Off, Color Space=sRGB, Color Temp=Neutral, Eco=Off, DCR=Off\n" +
-                " Acer: Modo sRGB=ON, Temp=Neutro (esta Quente), Aum. de Preto=0 (esta 3), Super Nitidez=OFF (esta ON), ACM=OFF\n" +
-                "\nDepois compare com o pattern '50% cinza' nos dois e refine Realce/Gamma. No fim 'Salvar perfil'.");
+            if (selPerfil == null) return;
+            string nome = prof == null ? "" : prof.Name;
+            if (string.IsNullOrEmpty(nome) || (string.IsNullOrEmpty(prof.Id) && nome == "Perfil"))
+                nome = "Calibração atual";
+            selPerfil.Text = nome;
+            if (mexerStatus && _status != null)
+                _status.Text = string.IsNullOrEmpty(prof.Id)
+                    ? "Perfil de trabalho \"" + nome + "\" — edições ficam só aqui até você usar \"+ Novo perfil\"."
+                    : "Perfil \"" + nome + "\" ativo — as edições são salvas nele.";
         }
 
-        // Preset inspirado no "Generic RGB Profile" do macOS (display gamma 1.8, neutro):
-        // como o LUT do app aplica x^(1/g) sobre um monitor ~2.2, o g que resulta em
-        // gamma efetivo 1.8 é 2.2/1.8 ~= 1.22 (e não 1.8, que ficaria lavado demais).
-        void GenericRgbPreset()
+        class PerfilMac
         {
-            if (MessageBox.Show("Aplicar o preset GENERIC RGB (macOS)?\n\n" +
-                "Gamma efetivo ~1.8 (curva 1.22 no app), DDC neutro e ganhos 1.0 — imita o perfil 'Generic RGB' que você usou no Hackintosh.\n" +
-                "Isso substitui a calibração atual dos monitores.",
-                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            public string Nome;
+            public double Curva;
+            public string Detalhe;
+            public PerfilMac(string n, double c, string d) { Nome = n; Curva = c; Detalhe = d; }
+        }
+
+        // perfis que acompanham o macOS (a curva é o que dá para reproduzir via LUT;
+        // primárias/white point não são representáveis numa LUT por canal)
+        static readonly PerfilMac[] MacPerfis = new PerfilMac[]
+        {
+            new PerfilMac("sRGB IEC61966-2.1",    1.00, "gamma efetivo 2.2"),
+            new PerfilMac("Display P3",            1.00, "gamma 2.2; primárias P3 não reproduzíveis"),
+            new PerfilMac("Adobe RGB (1998)",      1.00, "gamma 2.2"),
+            new PerfilMac("Apple RGB",             1.22, "gamma efetivo 1.8"),
+            new PerfilMac("Generic RGB",           1.22, "gamma efetivo 1.8"),
+            new PerfilMac("Generic Gray 2.2",      1.00, "gamma efetivo 2.2"),
+            new PerfilMac("Generic Gray",          1.22, "gamma efetivo 1.8"),
+            new PerfilMac("ProPhoto RGB",          1.22, "gamma efetivo 1.8"),
+        };
+
+        void AbrirMenuPerfis()
+        {
+            var m = new ContextMenuStrip();
+            m.Renderer = new ToolStripProfessionalRenderer(new MenuCores());
+            m.ShowImageMargin = false;
+            m.BackColor = Theme.Card2;
+            m.ForeColor = Theme.Text;
+            m.Font = Theme.F(9.5f);
+            m.Padding = new Padding(4);
+            m.MinimumSize = new Size(selPerfil.Width + 40, 0);
+
+            Func<string, ToolStripMenuItem> item = (txt) =>
+            {
+                var it = new ToolStripMenuItem(txt);
+                it.BackColor = Theme.Card2;
+                it.ForeColor = Theme.Text;
+                it.Padding = new Padding(8, 5, 8, 5);
+                return it;
+            };
+
+            var atual = item("Calibração atual" + (string.IsNullOrEmpty(prof.Id) ? "   (editando)" : ""));
+            if (string.IsNullOrEmpty(prof.Id)) atual.Font = new Font(m.Font, FontStyle.Bold);
+            atual.Click += (s, e) =>
+            {
+                prof.Id = ""; prof.Name = "Calibração atual";
+                SaveProfile(false);
+                AtualizarPerfilTexto(true);
+            };
+            m.Items.Add(atual);
+            m.Items.Add(new ToolStripSeparator());
+
+            var perfis = ProfileLibrary.List();
+            var cab = item("PERFIS SALVOS");
+            cab.Enabled = false;
+            cab.ForeColor = Theme.Muted;
+            m.Items.Add(cab);
+            if (perfis.Count == 0)
+            {
+                var vazio = item("(nenhum ainda — use \"+ Novo perfil\")");
+                vazio.Enabled = false;
+                vazio.ForeColor = Theme.Muted;
+                m.Items.Add(vazio);
+            }
+            foreach (var p in perfis)
+            {
+                var it = item(p.Name);
+                if (p.Id == prof.Id) it.Font = new Font(m.Font, FontStyle.Bold);
+                var alvo = p;
+                it.Click += (s, e) => AplicarPerfil(alvo);
+                m.Items.Add(it);
+            }
+            m.Items.Add(new ToolStripSeparator());
+
+            var mac = item("PERFIS DO macOS (só a curva)");
+            mac.Enabled = false;
+            mac.ForeColor = Theme.Muted;
+            m.Items.Add(mac);
+            foreach (var pm in MacPerfis)
+            {
+                var it = item(pm.Nome + "   · " + pm.Detalhe);
+                var alvo = pm;
+                it.Click += (s, e) => AplicarMac(alvo);
+                m.Items.Add(it);
+            }
+            m.Items.Add(new ToolStripSeparator());
+
+            var salvar = item("+ Salvar como novo perfil...");
+            salvar.Click += (s, e) => SalvarComoNovoPerfil();
+            m.Items.Add(salvar);
+
+            if (!string.IsNullOrEmpty(prof.Id))
+            {
+                var ren = item("Renomear perfil...");
+                ren.Click += (s, e) => RenomearPerfil();
+                m.Items.Add(ren);
+
+                var del = item("Excluir perfil...");
+                del.ForeColor = Theme.Danger;
+                del.Click += (s, e) => ExcluirPerfil();
+                m.Items.Add(del);
+            }
+
+            m.Show(selPerfil, new Point(0, selPerfil.Height + 2));
+        }
+
+        void AplicarPerfil(Profile src)
+        {
+            if (src == null) return;
+            int n = 0, faltando = 0;
             foreach (var p in panels)
             {
-                p.Cal.Contrast = 50; p.Cal.RedGain = 50; p.Cal.GreenGain = 50; p.Cal.BlueGain = 50;
-                p.Cal.Gamma = 2.2 / 1.80078125; p.Cal.BrightMult = 1.0; p.Cal.BlackLift = 0;
-                p.Cal.GainR = p.Cal.GainG = p.Cal.GainB = 1.0;
+                var c = src.Match(p.Display.MonitorId, p.Display.DeviceName);
+                if (c == null) { faltando++; continue; }
+                p.Cal.CopyValuesFrom(c);
                 p.SyncSliders();
                 CallPrivate(p, "PushDdcAll");
                 CallPrivate(p, "ApplyCurve");
+                n++;
+            }
+            prof.Id = src.Id;
+            prof.Name = src.Name;
+            prof.UseSoftwareCurve = src.UseSoftwareCurve;
+            SaveProfile(false);
+            AtualizarPerfilTexto(true);
+            _status.Text = "Perfil \"" + src.Name + "\" aplicado em " + n + " monitor(es)" +
+                (faltando > 0 ? " (" + faltando + " sem entrada no perfil)" : "") + ".";
+            ProfileStore.Log("perfil da lista aplicado: " + src.Name + " (" + n + " monitor(es))");
+        }
+
+        void AplicarMac(PerfilMac pm)
+        {
+            if (MessageBox.Show("Aplicar \"" + pm.Nome + "\" (" + pm.Detalhe + ")?\n\n" +
+                "Só a curva de gamma muda em todos os monitores. Brilho, contraste e ganhos que você calibrou são mantidos.",
+                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            prof.Id = "";
+            prof.Name = "Calibração atual";
+            foreach (var p in panels)
+            {
+                p.Cal.Gamma = pm.Curva;
+                p.SyncSliders();
+                CallPrivate(p, "ApplyCurve");
             }
             SaveProfile(false);
-            MessageBox.Show("Preset 'Generic RGB' aplicado: gamma efetivo ~1.8 (curva 1.22), ganhos neutros.\n" +
-                "Refine Realce/Gamma se precisar e 'Salvar perfil'.",
-                "ColorMatch", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            AtualizarPerfilTexto(true);
+            _status.Text = "Curva \"" + pm.Nome + "\" aplicada. Use \"+ Novo perfil\" para guardar como perfil.";
+        }
+
+        void SalvarComoNovoPerfil()
+        {
+            string sugestao = prof.Name;
+            if (string.IsNullOrEmpty(sugestao) || sugestao == "Perfil" || sugestao == "Calibração atual")
+                sugestao = "Meu perfil";
+            if (!string.IsNullOrEmpty(prof.Id)) sugestao = prof.Name + " (cópia)";
+            string nome = PromptForm.Ask(this, "Novo perfil", "Nome do perfil:", sugestao);
+            if (nome == null) return;
+
+            Profile existente = null;
+            foreach (var p in ProfileLibrary.List())
+                if (string.Equals(p.Name, nome, StringComparison.CurrentCultureIgnoreCase)) { existente = p; break; }
+
+            if (existente != null &&
+                MessageBox.Show("Já existe um perfil \"" + nome + "\". Substituir?", "ColorMatch",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+
+            var novo = prof.Clone();
+            novo.Name = nome;
+            novo.Id = existente != null ? existente.Id : Guid.NewGuid().ToString("N");
+            ProfileLibrary.Save(novo);
+            prof.Id = novo.Id;
+            prof.Name = novo.Name;
+            SaveProfile(false);
+            AtualizarPerfilTexto(true);
+            _status.Text = "Perfil \"" + nome + "\" salvo e adicionado à lista.";
+            ProfileStore.Log("perfil criado: " + nome);
+        }
+
+        void RenomearPerfil()
+        {
+            if (string.IsNullOrEmpty(prof.Id))
+            {
+                MessageBox.Show("Este perfil ainda não está na lista. Use \"+ Novo perfil\" para salvá-lo primeiro.");
+                return;
+            }
+            string nome = PromptForm.Ask(this, "Renomear perfil", "Novo nome:", prof.Name);
+            if (nome == null) return;
+            prof.Name = nome;
+            ProfileLibrary.Save(prof);
+            SaveProfile(false);
+            AtualizarPerfilTexto(true);
+            _status.Text = "Perfil renomeado para \"" + nome + "\".";
+        }
+
+        void ExcluirPerfil()
+        {
+            if (string.IsNullOrEmpty(prof.Id))
+            {
+                MessageBox.Show("O perfil de trabalho ainda não está na lista (nada para excluir).");
+                return;
+            }
+            if (MessageBox.Show("Excluir o perfil \"" + prof.Name + "\" da lista?\n\nA calibração atual NÃO é alterada.",
+                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            var p = ProfileLibrary.FindById(prof.Id);
+            ProfileLibrary.Delete(p != null ? p : prof);
+            prof.Id = "";
+            prof.Name = "Calibração atual";
+            SaveProfile(false);
+            AtualizarPerfilTexto(true);
+            _status.Text = "Perfil removido da lista. A calibração atual continua aplicada.";
+            ProfileStore.Log("perfil excluído da lista");
         }
 
         // faixa de cinza na juncao das duas telas, com o app ainda acessivel
@@ -1567,6 +1765,9 @@ namespace ColorMatch
                 p.Cal.FriendlyName = p.Display.FriendlyName;
             }
             ProfileStore.Save(prof);
+            // se o perfil ativo veio da lista, mantém a cópia da biblioteca em dia
+            if (!string.IsNullOrEmpty(prof.Id))
+                try { ProfileLibrary.Save(prof); } catch { }
             _profStamp = System.IO.File.GetLastWriteTimeUtc(ProfileStore.ProfilePath);
             if (talk) MessageBox.Show("Perfil salvo em: " + ProfileStore.ProfilePath);
         }
@@ -1825,7 +2026,7 @@ namespace ColorMatch
             if (24 + cols * cardW + 24 > maxW) cols = Math.Max(1, (maxW - 48) / cardW);
             int rows = (panels.Count + cols - 1) / cols;
             int needW = 48 + cols * cardW;
-            int needH = 60 + _bar.GetPreferredSize(new Size(needW, 0)).Height + 26 + rows * cardH;
+            int needH = 60 + _bar.GetPreferredSize(new Size(needW, 0)).Height + 38 + rows * cardH;
             if (needW > wa.Width - 20) needW = wa.Width - 20;
             if (needH > wa.Height - 20) needH = wa.Height - 20;
             if (needW < 1030) needW = 1030;

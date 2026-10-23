@@ -488,4 +488,67 @@ namespace ColorMatch
             }
         }
     }
+
+    // caixinha de texto escura para pedir um nome (modal)
+    public class PromptForm : Form
+    {
+        TextBox _tb;
+
+        public string Valor { get { return _tb.Text; } }
+
+        public PromptForm(string titulo, string rotulo, string valor)
+        {
+            Text = titulo;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            StartPosition = FormStartPosition.CenterParent;
+            MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
+            BackColor = Theme.Bg; ForeColor = Theme.Text;
+            ClientSize = new Size(420, 148);
+            Font = Theme.F(9f);
+
+            var lbl = new Label();
+            lbl.Text = rotulo;
+            lbl.AutoSize = false;
+            lbl.Bounds = new Rectangle(18, 16, 384, 20);
+            lbl.ForeColor = Theme.Muted;
+            lbl.BackColor = Theme.Bg;
+            Controls.Add(lbl);
+
+            _tb = new TextBox();
+            _tb.Text = valor;
+            _tb.Bounds = new Rectangle(18, 42, 384, 26);
+            _tb.BackColor = Theme.Sunken;
+            _tb.ForeColor = Theme.Text;
+            _tb.BorderStyle = BorderStyle.FixedSingle;
+            _tb.Font = Theme.F(10f);
+            Controls.Add(_tb);
+
+            var ok = new ModernButton();
+            ok.Text = "OK";
+            ok.Accent = true;
+            ok.Bounds = new Rectangle(222, 92, 88, 34);
+            ok.DialogResult = DialogResult.OK;
+            Controls.Add(ok);
+
+            var cancel = new ModernButton();
+            cancel.Text = "Cancelar";
+            cancel.Bounds = new Rectangle(318, 92, 84, 34);
+            cancel.DialogResult = DialogResult.Cancel;
+            Controls.Add(cancel);
+
+            AcceptButton = ok;
+            CancelButton = cancel;
+            Shown += (s, e) => { _tb.Focus(); _tb.SelectAll(); };
+        }
+
+        public static string Ask(IWin32Window pai, string titulo, string rotulo, string valor)
+        {
+            using (var f = new PromptForm(titulo, rotulo, valor))
+            {
+                if (f.ShowDialog(pai) != DialogResult.OK) return null;
+                string t = f.Valor == null ? "" : f.Valor.Trim();
+                return t.Length == 0 ? null : t;
+            }
+        }
+    }
 }
