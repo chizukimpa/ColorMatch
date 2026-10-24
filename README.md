@@ -2,7 +2,7 @@
 
 > Iguala cor e brilho entre monitores no Windows.
 
-**Versão atual: 1.3.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
+**Versão atual: 1.3.1** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
 
 ## Sobre
 
@@ -29,10 +29,11 @@ Desenvolvido para rodar **100% invisível** (sem ícone na bandeja) e **sem UAC/
 - **Lista de perfis aplicáveis**: o seletor "Perfil" mostra a calibração atual e todos os
   perfis salvos (`%APPDATA%\ColorMatch\perfis\`). "+ Novo perfil" cria um snapshot na hora
   e ele já aparece na lista; dá para aplicar, renomear e excluir.
-- **Predefinições por monitor**: cada cartão tem o botão **Predefinição** com os perfis do
+- **Predefinições por monitor**: cada cartão tem a lista **Predefinição** com os perfis do
   macOS (sRGB IEC61966-2.1, Display P3, Adobe RGB (1998), Apple RGB, Generic RGB,
-  Generic Gray 2.2, Generic Gray e ProPhoto RGB). Aplica **só naquele monitor** e **só a
-  curva de gamma**; brilho/contraste/ganhos calibrados são mantidos.
+  Generic Gray 2.2, Generic Gray e ProPhoto RGB). Ela mostra a predefinição ativa daquele
+  monitor e aplica **só nele**, mudando **só a curva de gamma**; brilho/contraste/ganhos
+  calibrados são mantidos.
 - **Abertura instantânea**: o DDC/CI é lido em segundo plano depois que a janela aparece
   (monitor lento não segura mais a abertura).
 - **Reordenar cartões** arrastando o cabeçalho; a ordem fica salva no perfil.
@@ -112,6 +113,9 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 
 ## Histórico
 
+- **1.3.1** — a predefinição virou uma **lista visível em cada cartão** (mostra a predefinição
+  ativa e aplica sem confirmação); dica fixa explicando que o cartão é um monitor e o
+  "Perfil" do topo vale para os dois.
 - **1.3.0** — predefinições do macOS **por monitor** (botão dentro de cada cartão, muda só a
   curva daquele monitor); abertura instantânea (leitura DDC em segundo plano, sem segurar a
   janela); pedido de "mostrar janela" com nova tentativa quando o app já está rodando

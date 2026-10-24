@@ -14,7 +14,7 @@ namespace ColorMatch
     static class Program
     {
         // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
-        public const string Versao = "1.3.0";
+        public const string Versao = "1.3.1";
 
         [STAThread]
         static void Main(string[] args)
@@ -254,6 +254,8 @@ namespace ColorMatch
         Dictionary<string, Control> _lb = new Dictionary<string, Control>();
         Card _curvePrev;
         Label _st;
+        SelectBox _presetSel;
+        string _presetNome = "";
         Label _lblTitle;
         Label _lblDev;
         MainForm _owner;
@@ -297,7 +299,7 @@ namespace ColorMatch
         }
 
         const int WW = 520;
-        const int HH = 706;
+        const int HH = 746;
 
         public MonitorPanel(DisplayScreen ds, MonitorCal cal, Profile profile, MainForm owner)
         {
@@ -310,7 +312,7 @@ namespace ColorMatch
             DoubleBuffered = true;
             Dividers.Add(74);
             Dividers.Add(318);
-            Dividers.Add(608);
+            Dividers.Add(648);
             Build();
             // arrastar pelo cabeçalho do cartão troca a ordem (fica salva no perfil)
             LigarArrasto(this);
@@ -346,12 +348,25 @@ namespace ColorMatch
         }
 
         // predefinição aplicada só neste monitor (muda só a curva de gamma)
-        public void AplicarPredefinicao(double curva)
+        public string PresetAtual { get { return _presetNome; } }
+
+        public void AplicarPredefinicao(double curva, string nome)
         {
             Cal.Gamma = curva;
             SyncSliders();
+            _presetNome = nome == null ? "" : nome;
+            if (_presetSel != null)
+                _presetSel.Text = _presetNome == "" ? "— (personalizado)" : _presetNome;
             ApplyCurve();
         }
+
+        void PresetCustom()
+        {
+            _presetNome = "";
+            if (_presetSel != null) _presetSel.Text = "— (personalizado)";
+        }
+
+        public void LimparPreset() { PresetCustom(); }
 
         static readonly byte[] CodigosPrincipais = {
             Win.VCP_BRIGHTNESS, Win.VCP_CONTRAST, Win.VCP_RED_GAIN, Win.VCP_GREEN_GAIN, Win.VCP_BLUE_GAIN };
@@ -514,30 +529,41 @@ namespace ColorMatch
 
             // ---- curva ----
             Section("CURVA DE COR · LUT DO WINDOWS", 330);
-            int y2 = 362;
+
+            // predefinição DESTE monitor: a lista abre aqui e aplica só neste cartão
+            MkLabel("Predefinição", 20, 359, 86, Theme.F(9f), Theme.Text);
+            _presetSel = new SelectBox();
+            _presetSel.Location = new Point(110, 354);
+            _presetSel.Size = new Size(250, 28);
+            _presetSel.BackColor = Theme.Card;
+            _presetSel.Text = "— (personalizado)";
+            _presetSel.Click += (s, e) => { if (_owner != null) _owner.AbrirMenuPredefinicoes(this, _presetSel); };
+            Controls.Add(_presetSel);
+
+            int y2 = 402;
 
             MkLabel("Gamma", 20, y2 + 5, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_gamma", 110, y2, 40, 260, (int)(Cal.Gamma * 100), (s, e) => { Cal.Gamma = _tb["g_gamma"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_gamma", 110, y2, 40, 260, (int)(Cal.Gamma * 100), (s, e) => { PresetCustom(); Cal.Gamma = _tb["g_gamma"].Value / 100.0; ApplyCurve(); }, 208);
             _lb["g_gamma"] = MkChip(326, y2 + 2, 58);
 
             MkLabel("Brilho", 20, y2 + 45, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_bright", 110, y2 + 40, 80, 122, (int)(Cal.BrightMult * 100), (s, e) => { Cal.BrightMult = _tb["g_bright"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_bright", 110, y2 + 40, 80, 122, (int)(Cal.BrightMult * 100), (s, e) => { PresetCustom(); Cal.BrightMult = _tb["g_bright"].Value / 100.0; ApplyCurve(); }, 208);
             _lb["g_bright"] = MkChip(326, y2 + 42, 58);
 
             MkLabel("Preto", 20, y2 + 85, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_black", 110, y2 + 80, 0, 80, (int)(Cal.BlackLift * 1000), (s, e) => { Cal.BlackLift = _tb["g_black"].Value / 1000.0; ApplyCurve(); }, 208);
+            MkTrack("g_black", 110, y2 + 80, 0, 80, (int)(Cal.BlackLift * 1000), (s, e) => { PresetCustom(); Cal.BlackLift = _tb["g_black"].Value / 1000.0; ApplyCurve(); }, 208);
             _lb["g_black"] = MkChip(326, y2 + 82, 58);
 
             MkLabel("Realce R", 20, y2 + 125, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_r", 110, y2 + 120, 88, 112, (int)(Cal.GainR * 100), (s, e) => { Cal.GainR = _tb["g_r"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_r", 110, y2 + 120, 88, 112, (int)(Cal.GainR * 100), (s, e) => { PresetCustom(); Cal.GainR = _tb["g_r"].Value / 100.0; ApplyCurve(); }, 208);
             _lb["g_r"] = MkChip(326, y2 + 122, 58);
 
             MkLabel("Realce G", 20, y2 + 165, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_g", 110, y2 + 160, 88, 112, (int)(Cal.GainG * 100), (s, e) => { Cal.GainG = _tb["g_g"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_g", 110, y2 + 160, 88, 112, (int)(Cal.GainG * 100), (s, e) => { PresetCustom(); Cal.GainG = _tb["g_g"].Value / 100.0; ApplyCurve(); }, 208);
             _lb["g_g"] = MkChip(326, y2 + 162, 58);
 
             MkLabel("Realce B", 20, y2 + 205, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_b", 110, y2 + 200, 88, 112, (int)(Cal.GainB * 100), (s, e) => { Cal.GainB = _tb["g_b"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_b", 110, y2 + 200, 88, 112, (int)(Cal.GainB * 100), (s, e) => { PresetCustom(); Cal.GainB = _tb["g_b"].Value / 100.0; ApplyCurve(); }, 208);
             _lb["g_b"] = MkChip(326, y2 + 202, 58);
 
             _curvePrev = new Card();
@@ -552,26 +578,21 @@ namespace ColorMatch
 
             var neutral = MkButton("Curva zerada", 398, y2 + 108, 100, 28, false);
             neutral.Font = Theme.F(8.5f);
-            neutral.Click += (s, e) => { Cal.Gamma = 1.0; Cal.BrightMult = 1.0; Cal.BlackLift = 0; Cal.GainR = Cal.GainG = Cal.GainB = 1.0; SyncSliders(); ApplyCurve(); _owner.ProfileChanged(); };
-
-            // predefinições (perfis do macOS) aplicadas SÓ neste monitor
-            var preset = MkButton("Predefinição", 398, y2 + 146, 100, 28, false);
-            preset.Font = Theme.F(8.5f);
-            preset.Click += (s, e) => { if (_owner != null) _owner.AbrirMenuPredefinicoes(this, preset); };
+            neutral.Click += (s, e) => { PresetCustom(); Cal.Gamma = 1.0; Cal.BrightMult = 1.0; Cal.BlackLift = 0; Cal.GainR = Cal.GainG = Cal.GainB = 1.0; SyncSliders(); ApplyCurve(); _owner.ProfileChanged(); };
 
             // ---- testes visuais ----
-            Section("PADRÕES DE TESTE · ESC FECHA", 622);
+            Section("PADRÕES DE TESTE · ESC FECHA", 662);
             string[] pn = { "50% cinza", "Branco", "Preto", "Rampa", "Barras" };
             PatternKind[] pk = { PatternKind.Gray50, PatternKind.White, PatternKind.Black, PatternKind.Ramp, PatternKind.Bars };
             for (int i = 0; i < pk.Length; i++)
             {
                 var k = pk[i]; string n = pn[i];
-                var b = MkButton(n, 20 + i * 97, 646, 90, 30, false);
+                var b = MkButton(n, 20 + i * 97, 686, 90, 30, false);
                 b.Font = Theme.F(8.5f);
                 b.Click += (s, e) => { var f = new PatternForm(Display, k, Display.ToString()); f.Show(); };
             }
 
-            _st = MkLabel("", 20, 686, 480, Theme.F(8.5f), Theme.Good);
+            _st = MkLabel("", 20, 726, 480, Theme.F(8.5f), Theme.Good);
         }
 
         int GetCal(string key)
@@ -1253,8 +1274,9 @@ namespace ColorMatch
 
             _refIdx = displays.FindIndex(d => d.Primary);
             if (_refIdx < 0 && displays.Count > 0) _refIdx = 0;
-            AtualizarRefTexto();
+            AtualizarRefTexto(false);
             AtualizarPerfilTexto(false);
+            _status.Text = "Cada cartão ajusta o seu monitor. \"Perfil\" (topo) aplica nos dois. \"Predefinição\" (no cartão) muda só aquele monitor.";
 
             // ---- vigia: garante que a cor não se perca ----
             // Verifica a cada minuto se a LUT continua viva no Windows; se algo apagou
@@ -1590,9 +1612,14 @@ namespace ColorMatch
 
         void AtualizarRefTexto()
         {
+            AtualizarRefTexto(true);
+        }
+
+        void AtualizarRefTexto(bool explicar)
+        {
             if (selRef == null || displays == null || _refIdx < 0 || _refIdx >= displays.Count) return;
             selRef.Text = displays[_refIdx].ToString();
-            if (_status != null)
+            if (explicar && _status != null)
                 _status.Text = "Copiar DDC: pega brilho, contraste e ganhos de " + displays[_refIdx].ToString() +
                     " e aplica nos outros monitores.";
         }
@@ -1713,7 +1740,7 @@ namespace ColorMatch
             }
             m.Items.Add(new ToolStripSeparator());
 
-            var dica = item("Predefinições do macOS: use o botão dentro de cada cartão");
+            var dica = item("Predefinições: use a lista \"Predefinição\" dentro de cada cartão");
             dica.Enabled = false;
             dica.ForeColor = Theme.Muted;
             m.Items.Add(dica);
@@ -1748,6 +1775,7 @@ namespace ColorMatch
                 if (c == null) { faltando++; continue; }
                 p.Cal.CopyValuesFrom(c);
                 p.SyncSliders();
+                p.LimparPreset();
                 CallPrivate(p, "PushDdcAll");
                 CallPrivate(p, "ApplyCurve");
                 n++;
@@ -1789,7 +1817,8 @@ namespace ColorMatch
 
             foreach (var pm in MacPerfis)
             {
-                var it = item(pm.Nome + "   · " + pm.Detalhe);
+                var it = item(pm.Nome + "   ·   " + pm.Detalhe);
+                if (pm.Nome == mp.PresetAtual) it.Font = new Font(m.Font, FontStyle.Bold);
                 var alvo = pm;
                 var painel = mp;
                 it.Click += (s, e) => AplicarMacEm(painel, alvo);
@@ -1802,14 +1831,11 @@ namespace ColorMatch
         void AplicarMacEm(MonitorPanel mp, PerfilMac pm)
         {
             if (mp == null || pm == null) return;
-            if (MessageBox.Show("Aplicar \"" + pm.Nome + "\" (" + pm.Detalhe + ") só no " + mp.MarcaTexto() + "?\n\n" +
-                "Só a curva de gamma deste monitor muda. Brilho, contraste e ganhos que você calibrou ficam iguais.",
-                "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
             // vira perfil de trabalho: não altera um perfil salvo na lista
             prof.Id = "";
             prof.Name = "Calibração atual";
-            mp.AplicarPredefinicao(pm.Curva);
+            mp.AplicarPredefinicao(pm.Curva, pm.Nome);
             SaveProfile(false);
             AtualizarPerfilTexto(true);
             _status.Text = "Predefinição \"" + pm.Nome + "\" aplicada só no " + mp.MarcaTexto() + ".";
@@ -2177,7 +2203,7 @@ namespace ColorMatch
         {
             if (_bar == null || _flow == null || panels.Count == 0) return;
             var wa = Screen.FromControl(this).WorkingArea;
-            const int cardW = 532, cardH = 718;
+            const int cardW = 532, cardH = 758;
             int cols = panels.Count;
             int maxW = wa.Width - 60;
             if (24 + cols * cardW + 24 > maxW) cols = Math.Max(1, (maxW - 48) / cardW);
