@@ -14,13 +14,31 @@ namespace ColorMatch
     static class Program
     {
         // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
-        public const string Versao = "1.2.0";
+        public const string Versao = "1.3.0";
 
         [STAThread]
         static void Main(string[] args)
         {
             if (args == null) args = new string[0];
             Func<string, bool> pedido = t => args.Any(a => a.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            // diagnóstico: qualquer falha inesperada fica registrada e visível
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                try { ProfileStore.Log("ERRO FATAL: " + e.ExceptionObject); } catch { }
+                try
+                {
+                    MessageBox.Show("O ColorMatch encontrou um erro inesperado.\n\n" + e.ExceptionObject +
+                        "\n\nLog: " + ProfileStore.LogPath, "ColorMatch", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                catch { }
+            };
+            try
+            {
+                ProfileStore.Log("inicio v" + Versao + " — " + Environment.OSVersion.VersionString +
+                    " — CLR " + Environment.Version + " — " + (Environment.Is64BitProcess ? "64" : "32") + " bits");
+            }
+            catch { }
 
             // /aplicar: aplica o perfil salvo e sai. Não usa o mutex — pode rodar
             // mesmo com o app já aberto (é só uma escrita de DDC + curva).
@@ -59,14 +77,27 @@ namespace ColorMatch
         }
 
         // avisa a instância que já está rodando (nome do evento = "ColorMatch_" + sufixo)
+        // a instância pode ainda estar iniciando (DDC lento): tenta por até ~10 s
         static void Sinalizar(string sufixo)
         {
-            try
+            for (int i = 0; i < 40; i++)
             {
-                using (var ev = EventWaitHandle.OpenExisting("ColorMatch_" + sufixo))
-                    ev.Set();
+                try
+                {
+                    using (var ev = EventWaitHandle.OpenExisting("ColorMatch_" + sufixo))
+                    { ev.Set(); return; }
+                }
+                catch (WaitHandleCannotBeOpenedException)
+                {
+                    Thread.Sleep(250);
+                }
+                catch (Exception e)
+                {
+                    ProfileStore.Log("Sinalizar(" + sufixo + "): " + e.Message);
+                    return;
+                }
             }
-            catch (Exception e) { ProfileStore.Log("Sinalizar(" + sufixo + "): " + e.Message); }
+            ProfileStore.Log("Sinalizar(" + sufixo + "): instância não respondeu em 10 s");
         }
 
         // aplica o perfil salvo sem abrir janela (usado no login)
@@ -285,7 +316,41 @@ namespace ColorMatch
             LigarArrasto(this);
             if (_lblTitle != null) { LigarArrasto(_lblTitle); _lblTitle.Cursor = Cursors.SizeAll; }
             if (_lblDev != null) { LigarArrasto(_lblDev); _lblDev.Cursor = Cursors.SizeAll; }
-            RefreshFromHardware(readSlDdc: true);
+            // NADA de DDC aqui: a janela precisa aparecer na hora. A leitura/checagem
+            // do DDC é feita depois, em segundo plano (IniciarSondagemDdc).
+            SyncSliders();
+            ApplyCurve();
+        }
+
+        // chamado em segundo plano: adota o DDC na primeira vez ou repõe o do perfil
+        public void SondarDdc()
+        {
+            AdotarOuReporDdc();
+        }
+
+        public void StatusLendo()
+        {
+            if (_st != null) _st.Text = "verificando DDC do monitor...";
+        }
+
+        public string AvisoDdc = "";
+
+        public void MostrarAvisoDdc()
+        {
+            if (_st != null && !string.IsNullOrEmpty(AvisoDdc)) _st.Text = AvisoDdc;
+        }
+
+        public void StatusPronto()
+        {
+            ApplyCurve();
+        }
+
+        // predefinição aplicada só neste monitor (muda só a curva de gamma)
+        public void AplicarPredefinicao(double curva)
+        {
+            Cal.Gamma = curva;
+            SyncSliders();
+            ApplyCurve();
         }
 
         static readonly byte[] CodigosPrincipais = {
@@ -489,6 +554,11 @@ namespace ColorMatch
             neutral.Font = Theme.F(8.5f);
             neutral.Click += (s, e) => { Cal.Gamma = 1.0; Cal.BrightMult = 1.0; Cal.BlackLift = 0; Cal.GainR = Cal.GainG = Cal.GainB = 1.0; SyncSliders(); ApplyCurve(); _owner.ProfileChanged(); };
 
+            // predefinições (perfis do macOS) aplicadas SÓ neste monitor
+            var preset = MkButton("Predefinição", 398, y2 + 146, 100, 28, false);
+            preset.Font = Theme.F(8.5f);
+            preset.Click += (s, e) => { if (_owner != null) _owner.AbrirMenuPredefinicoes(this, preset); };
+
             // ---- testes visuais ----
             Section("PADRÕES DE TESTE · ESC FECHA", 622);
             string[] pn = { "50% cinza", "Branco", "Preto", "Rampa", "Barras" };
@@ -632,6 +702,7 @@ namespace ColorMatch
             var h = H();
             if (h == IntPtr.Zero) return;
             uint cur, mx;
+            AvisoDdc = "";
 
             if (Cal.Nova)
             {
@@ -641,6 +712,7 @@ namespace ColorMatch
                 if (Win.ReadVCP(h, Win.VCP_GREEN_GAIN, out cur, out mx)) Cal.GreenGain = (int)cur;
                 if (Win.ReadVCP(h, Win.VCP_BLUE_GAIN, out cur, out mx)) Cal.BlueGain = (int)cur;
                 Cal.Nova = false;
+                AvisoDdc = "Monitor novo: valores DDC atuais adotados no perfil.";
                 ProfileStore.Log("monitor novo no perfil: " + Display.DeviceName + " adotou DDC " +
                     Cal.Brightness + "/" + Cal.Contrast + "/" + Cal.RedGain + "/" + Cal.GreenGain + "/" + Cal.BlueGain);
                 return;
@@ -660,7 +732,7 @@ namespace ColorMatch
             if (dif != "")
             {
                 ProfileStore.Log("DDC do monitor estava diferente do perfil — corrigido em " + Display.DeviceName + ":" + dif);
-                _st.Text = "DDC do monitor corrigido para o do perfil." + dif;
+                AvisoDdc = "DDC do monitor corrigido para o do perfil." + dif;
             }
         }
 
@@ -776,6 +848,7 @@ namespace ColorMatch
         FlowLayoutPanel _flow;
         FlowLayoutPanel _bar;
         bool _startHidden;
+        System.Windows.Forms.Timer _probeTimer;
         bool _invisible;
         DateTime _profStamp = DateTime.MinValue;
         EventWaitHandle _evShow, _evStop;
@@ -812,6 +885,13 @@ namespace ColorMatch
                 t.Interval = 1500;
                 t.Tick += (x, y) => { t.Stop(); try { ReapplyAllQuiet("janela exibida"); } catch { } };
                 t.Start();
+
+                // DDC é lento em alguns monitores: só depois da janela visível, em segundo plano
+                var tp = new System.Windows.Forms.Timer();
+                tp.Interval = 1200;
+                tp.Tick += (x, y) => { tp.Stop(); try { IniciarSondagemDdc(); } catch { } };
+                tp.Start();
+                _probeTimer = tp;
             };
         }
 
@@ -1224,12 +1304,11 @@ namespace ColorMatch
             {
                 try
                 {
-                    Win.AttachPhysical(ds);
                     var cal = ds.Cal != null ? ds.Cal : prof.GetByMonitorId(ds.MonitorId, ds.DeviceName);
                     var mp = new MonitorPanel(ds, cal, prof, this);
-                    // banco de dados: identifica o monitor e guarda o que ele tem (EDID + DDC/CI)
-                    var ent = MonitorDb.Obter(ds, true, false);
-                    mp.AplicarSuporte(ent);
+                    // usa só o que o banco já sabe (sem DDC agora); o resto vem em segundo plano
+                    var ent = MonitorDb.PorChave(Profile.HardwareKey(ds.MonitorId));
+                    if (ent != null) mp.AplicarSuporte(ent);
                     panels.Add(mp);
                     flow.Controls.Add(mp);
                 }
@@ -1239,8 +1318,8 @@ namespace ColorMatch
             if (displays.Count == 0 || panels.Count == 0)
             {
                 ProfileStore.Log("AVISO: displays=" + displays.Count + " paineis=" + panels.Count);
-                MessageBox.Show("Nenhum painel de monitor foi criado.\nMonitores detectados: " + displays.Count +
-                    "\nDetalhes em: " + ProfileStore.LogPath);
+                _status.Text = "Nenhum painel de monitor foi criado (monitores detectados: " + displays.Count +
+                    "). Detalhes em " + ProfileStore.LogPath;
             }
 
             ReordenarPaineis();
@@ -1300,6 +1379,47 @@ namespace ColorMatch
                         try { AbrirOsd(p); } catch (Exception ex) { ProfileStore.Log("OSD: " + ex.Message); }
                 };
                 tl.Start();
+            }
+        }
+
+        // DDC em segundo plano: a janela já está visível; cada monitor é verificado
+        // sem travar a interface (alguns monitores levam segundos em cada leitura).
+        void IniciarSondagemDdc()
+        {
+            if (panels.Count == 0) return;
+            ProfileStore.Log("sondagem DDC em segundo plano: " + panels.Count + " monitor(es)");
+            foreach (var mp in panels.ToArray())
+            {
+                var alvo = mp;
+                try { alvo.StatusLendo(); } catch { }
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try
+                    {
+                        Win.AttachPhysical(alvo.Display);
+                        alvo.SondarDdc();
+                    }
+                    catch (Exception ex)
+                    {
+                        ProfileStore.Log("sondagem DDC " + alvo.Display.DeviceName + ": " + ex.Message);
+                    }
+                    try
+                    {
+                        BeginInvoke((MethodInvoker)delegate
+                        {
+                            try
+                            {
+                                alvo.SyncSliders();
+                                var ent = MonitorDb.PorChave(Profile.HardwareKey(alvo.Display.MonitorId));
+                                if (ent != null) alvo.AplicarSuporte(ent);
+                                alvo.MostrarAvisoDdc();
+                                if (string.IsNullOrEmpty(alvo.AvisoDdc)) alvo.StatusPronto();
+                            }
+                            catch { }
+                        });
+                    }
+                    catch { }
+                });
             }
         }
 
@@ -1593,17 +1713,10 @@ namespace ColorMatch
             }
             m.Items.Add(new ToolStripSeparator());
 
-            var mac = item("PERFIS DO macOS (só a curva)");
-            mac.Enabled = false;
-            mac.ForeColor = Theme.Muted;
-            m.Items.Add(mac);
-            foreach (var pm in MacPerfis)
-            {
-                var it = item(pm.Nome + "   · " + pm.Detalhe);
-                var alvo = pm;
-                it.Click += (s, e) => AplicarMac(alvo);
-                m.Items.Add(it);
-            }
+            var dica = item("Predefinições do macOS: use o botão dentro de cada cartão");
+            dica.Enabled = false;
+            dica.ForeColor = Theme.Muted;
+            m.Items.Add(dica);
             m.Items.Add(new ToolStripSeparator());
 
             var salvar = item("+ Salvar como novo perfil...");
@@ -1649,22 +1762,58 @@ namespace ColorMatch
             ProfileStore.Log("perfil da lista aplicado: " + src.Name + " (" + n + " monitor(es))");
         }
 
-        void AplicarMac(PerfilMac pm)
+        // menu de predefinições de UM monitor (aberto pelo botão "Predefinição" do cartão)
+        public void AbrirMenuPredefinicoes(MonitorPanel mp, Control ancora)
         {
-            if (MessageBox.Show("Aplicar \"" + pm.Nome + "\" (" + pm.Detalhe + ")?\n\n" +
-                "Só a curva de gamma muda em todos os monitores. Brilho, contraste e ganhos que você calibrou são mantidos.",
+            var m = new ContextMenuStrip();
+            m.Renderer = new ToolStripProfessionalRenderer(new MenuCores());
+            m.ShowImageMargin = false;
+            m.BackColor = Theme.Card2;
+            m.ForeColor = Theme.Text;
+            m.Font = Theme.F(9.5f);
+            m.Padding = new Padding(4);
+
+            Func<string, ToolStripMenuItem> item = (txt) =>
+            {
+                var it = new ToolStripMenuItem(txt);
+                it.BackColor = Theme.Card2;
+                it.ForeColor = Theme.Text;
+                it.Padding = new Padding(8, 5, 8, 5);
+                return it;
+            };
+
+            var cab = item("PREDEFINIÇÃO · " + mp.MarcaTexto());
+            cab.Enabled = false;
+            cab.ForeColor = Theme.Muted;
+            m.Items.Add(cab);
+
+            foreach (var pm in MacPerfis)
+            {
+                var it = item(pm.Nome + "   · " + pm.Detalhe);
+                var alvo = pm;
+                var painel = mp;
+                it.Click += (s, e) => AplicarMacEm(painel, alvo);
+                m.Items.Add(it);
+            }
+
+            m.Show(ancora, new Point(0, ancora.Height + 2));
+        }
+
+        void AplicarMacEm(MonitorPanel mp, PerfilMac pm)
+        {
+            if (mp == null || pm == null) return;
+            if (MessageBox.Show("Aplicar \"" + pm.Nome + "\" (" + pm.Detalhe + ") só no " + mp.MarcaTexto() + "?\n\n" +
+                "Só a curva de gamma deste monitor muda. Brilho, contraste e ganhos que você calibrou ficam iguais.",
                 "ColorMatch", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+
+            // vira perfil de trabalho: não altera um perfil salvo na lista
             prof.Id = "";
             prof.Name = "Calibração atual";
-            foreach (var p in panels)
-            {
-                p.Cal.Gamma = pm.Curva;
-                p.SyncSliders();
-                CallPrivate(p, "ApplyCurve");
-            }
+            mp.AplicarPredefinicao(pm.Curva);
             SaveProfile(false);
             AtualizarPerfilTexto(true);
-            _status.Text = "Curva \"" + pm.Nome + "\" aplicada. Use \"+ Novo perfil\" para guardar como perfil.";
+            _status.Text = "Predefinição \"" + pm.Nome + "\" aplicada só no " + mp.MarcaTexto() + ".";
+            ProfileStore.Log("predefinição " + pm.Nome + " aplicada em " + mp.Display.DeviceName);
         }
 
         void SalvarComoNovoPerfil()
@@ -1791,6 +1940,12 @@ namespace ColorMatch
                     p.SyncSliders();
                 }
                 if (chkTray != null) chkTray.Checked = saved.InvisibleMode;
+                prof.Name = saved.Name;
+                prof.Id = saved.Id;
+                prof.UseSoftwareCurve = saved.UseSoftwareCurve;
+                prof.InvisibleMode = saved.InvisibleMode;
+                prof.AutoStart = saved.AutoStart;
+                AtualizarPerfilTexto(false);
                 ProfileStore.Log("vigia: perfil mudou no disco — recarregado");
             }
             catch (Exception ex) { ProfileStore.Log("vigia: falha ao recarregar perfil (" + ex.Message + ")"); }
@@ -1964,7 +2119,8 @@ namespace ColorMatch
                     if (d.PhysicalHandle == IntPtr.Zero) Win.AttachPhysical(d);
                     p.RefreshHeader();
                     if (d.Cal != null && d.Cal != p.Cal) { p.Cal = d.Cal; p.SyncSliders(); }
-                    p.AplicarSuporte(MonitorDb.Obter(d, true, false));
+                    var entCache = MonitorDb.PorChave(Profile.HardwareKey(d.MonitorId));
+                    if (entCache != null) p.AplicarSuporte(entCache);
                 }
 
                 // monitor ligado depois que o app abriu: ganha painel próprio (UI + vigia)
@@ -1974,7 +2130,8 @@ namespace ColorMatch
                     Win.AttachPhysical(d);
                     var cal = d.Cal != null ? d.Cal : prof.GetByMonitorId(d.MonitorId, d.DeviceName);
                     var mp = new MonitorPanel(d, cal, prof, this);
-                    mp.AplicarSuporte(MonitorDb.Obter(d, true, false));
+                    var entNovo = MonitorDb.PorChave(Profile.HardwareKey(d.MonitorId));
+                    if (entNovo != null) mp.AplicarSuporte(entNovo);
                     panels.Add(mp);
                     if (_flow != null) _flow.Controls.Add(mp);
                     ProfileStore.Log("painel criado para monitor que ligou depois: " + d.DeviceName + " (" + d.FriendlyName + ")");
