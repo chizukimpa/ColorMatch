@@ -489,6 +489,195 @@ namespace ColorMatch
         }
     }
 
+    // janela do filtro de cor de um monitor: temperatura/matiz (LUT) + saturação (DDC)
+    public class FilterForm : Form
+    {
+        MonitorPanel _mp;
+        ModernSlider _temp, _tint, _sat;
+        Label _lblTemp, _lblTint, _lblSat, _satInfo;
+        bool _carregando = true;
+        bool _satOk;
+        int _satMax = 100;
+
+        public FilterForm(MonitorPanel mp)
+        {
+            _mp = mp;
+            Text = "Filtro de cor — " + mp.MarcaTexto();
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            StartPosition = FormStartPosition.CenterParent;
+            MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
+            BackColor = Theme.Bg; ForeColor = Theme.Text;
+            ClientSize = new Size(460, 392);
+            Font = Theme.F(9f);
+
+            Lbl("Temperatura", 20, 18, Theme.Text);
+            _lblTemp = Lbl("", 250, 18, Theme.Muted);
+            _lblTemp.TextAlign = ContentAlignment.TopRight;
+            _temp = Slider(20, 42, -100, 100, (int)Math.Round(mp.Cal.Temp * 100));
+            Small("Frio (azul)", 20, 72);
+            SmallRight("Quente (vermelho)", 20, 72);
+
+            Lbl("Matiz", 20, 104, Theme.Text);
+            _lblTint = Lbl("", 250, 104, Theme.Muted);
+            _lblTint.TextAlign = ContentAlignment.TopRight;
+            _tint = Slider(20, 128, -100, 100, (int)Math.Round(mp.Cal.Tint * 100));
+            Small("Verde", 20, 158);
+            SmallRight("Magenta", 20, 158);
+
+            Lbl("Saturação (DDC/CI)", 20, 190, Theme.Text);
+            _lblSat = Lbl("", 250, 190, Theme.Muted);
+            _lblSat.TextAlign = ContentAlignment.TopRight;
+            _sat = Slider(20, 214, 0, 100, 50);
+
+            _satInfo = new Label();
+            _satInfo.AutoSize = false;
+            _satInfo.Bounds = new Rectangle(20, 248, 420, 44);
+            _satInfo.ForeColor = Theme.Muted;
+            _satInfo.BackColor = Theme.Bg;
+            _satInfo.Font = Theme.F(8.25f);
+            Controls.Add(_satInfo);
+
+            int v, mx;
+            _satOk = mp.SaturacaoDisponivel(out v, out mx);
+            if (mx > 0) _satMax = mx;
+            _sat.Minimum = 0;
+            _sat.Maximum = _satMax;
+            if (_satOk)
+            {
+                int atual = mp.Cal.Saturation >= 0 ? mp.Cal.Saturation : v;
+                if (atual < 0) atual = 0;
+                if (atual > _satMax) atual = _satMax;
+                _sat.Value = atual;
+                _satInfo.Text = "Saturação do próprio monitor via DDC/CI (VCP 0x8A).";
+            }
+            else
+            {
+                _sat.Value = 0;
+                _sat.Enabled = false;
+                _satInfo.Text = "Este monitor não expõe saturação por DDC/CI.\n" +
+                    "Use o controle de saturação no menu (OSD) do próprio monitor.";
+            }
+
+            _carregando = false;
+
+            _temp.ValueChanged += (s, e) =>
+            {
+                if (_carregando) return;
+                _mp.Cal.Temp = _temp.Value / 100.0;
+                _mp.Edicao();
+                _mp.AplicarLut();
+                Rotulos();
+            };
+            _tint.ValueChanged += (s, e) =>
+            {
+                if (_carregando) return;
+                _mp.Cal.Tint = _tint.Value / 100.0;
+                _mp.Edicao();
+                _mp.AplicarLut();
+                Rotulos();
+            };
+            _sat.ValueChanged += (s, e) =>
+            {
+                if (_carregando || !_satOk) return;
+                _mp.DefinirSaturacao(_sat.Value);
+                Rotulos();
+            };
+
+            var bFrio = Btn("Frio", 20, 336, 90);
+            bFrio.Click += (s, e) => { _temp.Value = -60; };
+            var bNeutro = Btn("Neutro", 120, 336, 90);
+            bNeutro.Click += (s, e) =>
+            {
+                _temp.Value = 0;
+                _tint.Value = 0;
+                if (_satOk) _sat.Value = _satMax / 2;
+            };
+            var bQuente = Btn("Quente", 220, 336, 90);
+            bQuente.Click += (s, e) => { _temp.Value = 60; };
+            var bFechar = Btn("Fechar", 350, 336, 90);
+            bFechar.Click += (s, e) => Close();
+
+            AcceptButton = bFechar;
+            CancelButton = bFechar;
+
+            Rotulos();
+        }
+
+        void Rotulos()
+        {
+            if (_lblTemp != null)
+                _lblTemp.Text = _temp.Value == 0 ? "neutro"
+                    : (_temp.Value > 0 ? "quente " + _temp.Value + "%" : "frio " + (-_temp.Value) + "%");
+            if (_lblTint != null)
+                _lblTint.Text = _tint.Value == 0 ? "neutro"
+                    : (_tint.Value > 0 ? "magenta " + _tint.Value + "%" : "verde " + (-_tint.Value) + "%");
+            if (_lblSat != null)
+                _lblSat.Text = _satOk ? (_sat.Value + " / " + _satMax) : "sem suporte";
+        }
+
+        Label Lbl(string t, int x, int y, Color cor)
+        {
+            var l = new Label();
+            l.Text = t;
+            l.AutoSize = false;
+            l.Bounds = new Rectangle(x, y, 180, 20);
+            l.ForeColor = cor;
+            l.BackColor = Theme.Bg;
+            Controls.Add(l);
+            return l;
+        }
+
+        void Small(string t, int x, int y)
+        {
+            var l = new Label();
+            l.Text = t;
+            l.AutoSize = false;
+            l.Bounds = new Rectangle(x, y, 180, 18);
+            l.ForeColor = Theme.Muted;
+            l.BackColor = Theme.Bg;
+            l.Font = Theme.F(8.25f);
+            Controls.Add(l);
+        }
+
+        void SmallRight(string t, int x, int y)
+        {
+            var l = new Label();
+            l.Text = t;
+            l.AutoSize = false;
+            l.Bounds = new Rectangle(x, y, 420, 18);
+            l.TextAlign = ContentAlignment.TopRight;
+            l.ForeColor = Theme.Muted;
+            l.BackColor = Theme.Bg;
+            l.Font = Theme.F(8.25f);
+            Controls.Add(l);
+        }
+
+        ModernSlider Slider(int x, int y, int min, int max, int val)
+        {
+            var s = new ModernSlider();
+            s.Minimum = min;
+            s.Maximum = max;
+            s.Size = new Size(420, 28);
+            s.Location = new Point(x, y);
+            s.BackColor = Theme.Bg;
+            s.Value = Math.Max(min, Math.Min(max, val));
+            Controls.Add(s);
+            return s;
+        }
+
+        ModernButton Btn(string t, int x, int y, int w)
+        {
+            var b = new ModernButton();
+            b.Text = t;
+            b.Location = new Point(x, y);
+            b.Size = new Size(w, 32);
+            b.BackColor = Theme.Bg;
+            b.Font = Theme.F(8.75f);
+            Controls.Add(b);
+            return b;
+        }
+    }
+
     // caixinha de texto escura para pedir um nome (modal)
     public class PromptForm : Form
     {

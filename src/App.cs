@@ -14,7 +14,7 @@ namespace ColorMatch
     static class Program
     {
         // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
-        public const string Versao = "1.3.1";
+        public const string Versao = "1.4.0";
 
         [STAThread]
         static void Main(string[] args)
@@ -118,7 +118,8 @@ namespace ColorMatch
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_GREEN_GAIN, (uint)c.GreenGain);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BLUE_GAIN, (uint)c.BlueGain);
-                    bool rampOk = Win.WriteRamp(ds.DeviceName, Win.BuildRamp(c.Gamma, c.BrightMult, c.BlackLift, c.GainR, c.GainG, c.GainB));
+                    if (c.Saturation >= 0) Win.WriteVCP(ds.PhysicalHandle, 0x8A, (uint)c.Saturation);
+                    bool rampOk = Win.WriteRamp(ds.DeviceName, c.Ramp());
                     ProfileStore.Log("aplicado: " + ds.DeviceName + " (" + ds.FriendlyName + ")" +
                         (rampOk ? " LUT ok" : " FALHA LUT"));
                 }
@@ -137,8 +138,9 @@ namespace ColorMatch
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_GREEN_GAIN, (uint)c.GreenGain);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BLUE_GAIN, (uint)c.BlueGain);
+                if (c.Saturation >= 0) Win.WriteVCP(ds.PhysicalHandle, 0x8A, (uint)c.Saturation);
                 if (curves)
-                    Win.WriteRamp(ds.DeviceName, Win.BuildRamp(c.Gamma, c.BrightMult, c.BlackLift, c.GainR, c.GainG, c.GainB));
+                    Win.WriteRamp(ds.DeviceName, c.Ramp());
             }
         }
     }
@@ -254,6 +256,7 @@ namespace ColorMatch
         Dictionary<string, Control> _lb = new Dictionary<string, Control>();
         Card _curvePrev;
         Label _st;
+        bool _syncSliders;
         SelectBox _presetSel;
         string _presetNome = "";
         Label _lblTitle;
@@ -358,6 +361,46 @@ namespace ColorMatch
             if (_presetSel != null)
                 _presetSel.Text = _presetNome == "" ? "— (personalizado)" : _presetNome;
             ApplyCurve();
+        }
+
+        // perfil ICC importado: curva + ganhos calculados do perfil, só neste monitor
+        public void AplicarIcc(IccPerfil icc)
+        {
+            if (icc == null) return;
+            Cal.Gamma = icc.Gamma;
+            Cal.BrightMult = icc.BrightMult;
+            Cal.BlackLift = icc.BlackLift;
+            Cal.GainR = icc.GainR;
+            Cal.GainG = icc.GainG;
+            Cal.GainB = icc.GainB;
+            SyncSliders();
+            _presetNome = "ICC: " + icc.Nome;
+            if (_presetSel != null) _presetSel.Text = _presetNome;
+            ApplyCurve();
+        }
+
+        // aplica de novo a LUT com os valores atuais (usado pelo filtro de cor)
+        public void AplicarLut() { ApplyCurve(); }
+        public void Edicao() { if (_owner != null) _owner.EditouPerfil(this); }
+        public void AvisarMudanca() { if (_owner != null) _owner.ProfileChanged(); }
+
+        // saturação do monitor via DDC/CI (VCP 0x8A), quando o monitor suporta
+        public bool SaturacaoDisponivel(out int valor, out int max)
+        {
+            uint cur, mx;
+            bool ok = Win.ReadVCP(H(), 0x8A, out cur, out mx);
+            valor = (int)cur;
+            max = (int)mx;
+            return ok && mx > 0;
+        }
+
+        public void DefinirSaturacao(int v)
+        {
+            if (_owner != null) _owner.EditouPerfil(this);
+            Cal.Saturation = v;
+            Win.WriteVCP(H(), 0x8A, (uint)v);
+            if (_st != null) _st.Text = "Saturação (DDC): " + v + ".";
+            if (_owner != null) _owner.ProfileChanged();
         }
 
         void PresetCustom()
@@ -501,6 +544,7 @@ namespace ColorMatch
             var btZero = MkButton("Zerar DDC", 158, 80, 92, 28, false);
             btZero.Click += (s, e) =>
             {
+                if (_owner != null) _owner.EditouPerfil(this);
                 Cal.Contrast = 50; Cal.RedGain = 50; Cal.GreenGain = 50; Cal.BlueGain = 50;
                 SyncSliders(); PushDdcAll(); _owner.ProfileChanged();
                 _st.Text = "DDC neutro.";
@@ -543,27 +587,27 @@ namespace ColorMatch
             int y2 = 402;
 
             MkLabel("Gamma", 20, y2 + 5, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_gamma", 110, y2, 40, 260, (int)(Cal.Gamma * 100), (s, e) => { PresetCustom(); Cal.Gamma = _tb["g_gamma"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_gamma", 110, y2, 40, 260, (int)(Cal.Gamma * 100), (s, e) => { if (_syncSliders) return; Cal.Gamma = _tb["g_gamma"].Value / 100.0; if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); ApplyCurve(); }, 208);
             _lb["g_gamma"] = MkChip(326, y2 + 2, 58);
 
             MkLabel("Brilho", 20, y2 + 45, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_bright", 110, y2 + 40, 80, 122, (int)(Cal.BrightMult * 100), (s, e) => { PresetCustom(); Cal.BrightMult = _tb["g_bright"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_bright", 110, y2 + 40, 80, 122, (int)(Cal.BrightMult * 100), (s, e) => { if (_syncSliders) return; Cal.BrightMult = _tb["g_bright"].Value / 100.0; if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); ApplyCurve(); }, 208);
             _lb["g_bright"] = MkChip(326, y2 + 42, 58);
 
             MkLabel("Preto", 20, y2 + 85, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_black", 110, y2 + 80, 0, 80, (int)(Cal.BlackLift * 1000), (s, e) => { PresetCustom(); Cal.BlackLift = _tb["g_black"].Value / 1000.0; ApplyCurve(); }, 208);
+            MkTrack("g_black", 110, y2 + 80, 0, 80, (int)(Cal.BlackLift * 1000), (s, e) => { if (_syncSliders) return; Cal.BlackLift = _tb["g_black"].Value / 1000.0; if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); ApplyCurve(); }, 208);
             _lb["g_black"] = MkChip(326, y2 + 82, 58);
 
             MkLabel("Realce R", 20, y2 + 125, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_r", 110, y2 + 120, 88, 112, (int)(Cal.GainR * 100), (s, e) => { PresetCustom(); Cal.GainR = _tb["g_r"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_r", 110, y2 + 120, 88, 112, (int)(Cal.GainR * 100), (s, e) => { if (_syncSliders) return; Cal.GainR = _tb["g_r"].Value / 100.0; if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); ApplyCurve(); }, 208);
             _lb["g_r"] = MkChip(326, y2 + 122, 58);
 
             MkLabel("Realce G", 20, y2 + 165, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_g", 110, y2 + 160, 88, 112, (int)(Cal.GainG * 100), (s, e) => { PresetCustom(); Cal.GainG = _tb["g_g"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_g", 110, y2 + 160, 88, 112, (int)(Cal.GainG * 100), (s, e) => { if (_syncSliders) return; Cal.GainG = _tb["g_g"].Value / 100.0; if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); ApplyCurve(); }, 208);
             _lb["g_g"] = MkChip(326, y2 + 162, 58);
 
             MkLabel("Realce B", 20, y2 + 205, 86, Theme.F(9f), Theme.Text);
-            MkTrack("g_b", 110, y2 + 200, 88, 112, (int)(Cal.GainB * 100), (s, e) => { PresetCustom(); Cal.GainB = _tb["g_b"].Value / 100.0; ApplyCurve(); }, 208);
+            MkTrack("g_b", 110, y2 + 200, 88, 112, (int)(Cal.GainB * 100), (s, e) => { if (_syncSliders) return; Cal.GainB = _tb["g_b"].Value / 100.0; if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); ApplyCurve(); }, 208);
             _lb["g_b"] = MkChip(326, y2 + 202, 58);
 
             _curvePrev = new Card();
@@ -578,7 +622,12 @@ namespace ColorMatch
 
             var neutral = MkButton("Curva zerada", 398, y2 + 108, 100, 28, false);
             neutral.Font = Theme.F(8.5f);
-            neutral.Click += (s, e) => { PresetCustom(); Cal.Gamma = 1.0; Cal.BrightMult = 1.0; Cal.BlackLift = 0; Cal.GainR = Cal.GainG = Cal.GainB = 1.0; SyncSliders(); ApplyCurve(); _owner.ProfileChanged(); };
+            neutral.Click += (s, e) => { if (_owner != null) _owner.EditouPerfil(this); PresetCustom(); Cal.Gamma = 1.0; Cal.BrightMult = 1.0; Cal.BlackLift = 0; Cal.GainR = Cal.GainG = Cal.GainB = 1.0; SyncSliders(); ApplyCurve(); _owner.ProfileChanged(); };
+
+            // filtro de cor (temperatura/matiz na LUT; saturação por DDC se o monitor tiver)
+            var filtro = MkButton("Filtro de cor", 398, y2 + 146, 100, 28, false);
+            filtro.Font = Theme.F(8.5f);
+            filtro.Click += (s, e) => { if (_owner != null) _owner.AbrirFiltro(this); };
 
             // ---- testes visuais ----
             Section("PADRÕES DE TESTE · ESC FECHA", 662);
@@ -609,6 +658,7 @@ namespace ColorMatch
 
         void OnDdcChange(byte code, string key)
         {
+            if (_syncSliders) return;
             int v = _tb["ddc_" + key].Value;
             _lb["v_" + key].Text = v.ToString();
             switch (key)
@@ -619,6 +669,7 @@ namespace ColorMatch
                 case "green": Cal.GreenGain = v; break;
                 case "blue": Cal.BlueGain = v; break;
             }
+            if (_owner != null) _owner.EditouPerfil(this);
             var h = H();
             uint mv = (uint)Math.Max(1, v);
             Win.WriteVCP(h, code, mv);
@@ -653,11 +704,12 @@ namespace ColorMatch
             Win.WriteVCP(h, Win.VCP_RED_GAIN, (uint)Cal.RedGain);
             Win.WriteVCP(h, Win.VCP_GREEN_GAIN, (uint)Cal.GreenGain);
             Win.WriteVCP(h, Win.VCP_BLUE_GAIN, (uint)Cal.BlueGain);
+            if (Cal.Saturation >= 0) Win.WriteVCP(h, 0x8A, (uint)Cal.Saturation);
         }
 
         void ApplyCurve()
         {
-            var ramp = Win.BuildRamp(Cal.Gamma, Cal.BrightMult, Cal.BlackLift, Cal.GainR, Cal.GainG, Cal.GainB);
+            var ramp = Cal.Ramp();
             bool ok = Win.WriteRamp(Display.DeviceName, ramp);
             var got = Win.ReadRamp(Display.DeviceName);
             if (!ok || got == null) { _st.Text = "Falha na aplicação da LUT."; ProfileStore.Log("FALHA LUT " + Display.DeviceName); }
@@ -681,7 +733,7 @@ namespace ColorMatch
         // Compara a LUT que está viva no Windows com a que o perfil pede. Tolerância ~0.15%
         public bool CurveMatchesCal()
         {
-            var want = Win.BuildRamp(Cal.Gamma, Cal.BrightMult, Cal.BlackLift, Cal.GainR, Cal.GainG, Cal.GainB);
+            var want = Cal.Ramp();
             var got = Win.ReadRamp(Display.DeviceName);
             if (got == null || got.Length < 768) return false;
             for (int i = 0; i < 768; i++)
@@ -695,7 +747,7 @@ namespace ColorMatch
             estavaOk = CurveMatchesCal();
             if (estavaOk) return true;
             return Win.WriteRamp(Display.DeviceName,
-                Win.BuildRamp(Cal.Gamma, Cal.BrightMult, Cal.BlackLift, Cal.GainR, Cal.GainG, Cal.GainB));
+                Cal.Ramp());
         }
 
         public void CopyCalFrom(MonitorCal c)
@@ -750,6 +802,8 @@ namespace ColorMatch
             { Win.WriteVCP(h, Win.VCP_GREEN_GAIN, (uint)Cal.GreenGain); dif += " G=" + cur + "->" + Cal.GreenGain; }
             if (Win.ReadVCP(h, Win.VCP_BLUE_GAIN, out cur, out mx) && (int)cur != Cal.BlueGain)
             { Win.WriteVCP(h, Win.VCP_BLUE_GAIN, (uint)Cal.BlueGain); dif += " B=" + cur + "->" + Cal.BlueGain; }
+            if (Cal.Saturation >= 0 && Win.ReadVCP(h, 0x8A, out cur, out mx) && (int)cur != Cal.Saturation)
+            { Win.WriteVCP(h, 0x8A, (uint)Cal.Saturation); dif += " sat=" + cur + "->" + Cal.Saturation; }
             if (dif != "")
             {
                 ProfileStore.Log("DDC do monitor estava diferente do perfil — corrigido em " + Display.DeviceName + ":" + dif);
@@ -786,22 +840,27 @@ namespace ColorMatch
 
         public void SyncSliders()
         {
-            _tb["ddc_bright"].Value = Cal.Brightness;
-            _tb["ddc_contrast"].Value = Cal.Contrast;
-            _tb["ddc_red"].Value = Cal.RedGain;
-            _tb["ddc_green"].Value = Cal.GreenGain;
-            _tb["ddc_blue"].Value = Cal.BlueGain;
-            _lb["v_bright"].Text = Cal.Brightness.ToString();
-            _lb["v_contrast"].Text = Cal.Contrast.ToString();
-            _lb["v_red"].Text = Cal.RedGain.ToString();
-            _lb["v_green"].Text = Cal.GreenGain.ToString();
-            _lb["v_blue"].Text = Cal.BlueGain.ToString();
-            _tb["g_gamma"].Value = (int)Math.Max(40, Math.Min(260, Cal.Gamma * 100));
-            _tb["g_bright"].Value = (int)Math.Max(80, Math.Min(122, Cal.BrightMult * 100));
-            _tb["g_black"].Value = (int)Math.Max(0, Math.Min(80, Cal.BlackLift * 1000));
-            _tb["g_r"].Value = (int)Math.Max(88, Math.Min(112, Cal.GainR * 100));
-            _tb["g_g"].Value = (int)Math.Max(88, Math.Min(112, Cal.GainG * 100));
-            _tb["g_b"].Value = (int)Math.Max(88, Math.Min(112, Cal.GainB * 100));
+            _syncSliders = true;
+            try
+            {
+                _tb["ddc_bright"].Value = Cal.Brightness;
+                _tb["ddc_contrast"].Value = Cal.Contrast;
+                _tb["ddc_red"].Value = Cal.RedGain;
+                _tb["ddc_green"].Value = Cal.GreenGain;
+                _tb["ddc_blue"].Value = Cal.BlueGain;
+                _lb["v_bright"].Text = Cal.Brightness.ToString();
+                _lb["v_contrast"].Text = Cal.Contrast.ToString();
+                _lb["v_red"].Text = Cal.RedGain.ToString();
+                _lb["v_green"].Text = Cal.GreenGain.ToString();
+                _lb["v_blue"].Text = Cal.BlueGain.ToString();
+                _tb["g_gamma"].Value = (int)Math.Max(40, Math.Min(260, Cal.Gamma * 100));
+                _tb["g_bright"].Value = (int)Math.Max(80, Math.Min(122, Cal.BrightMult * 100));
+                _tb["g_black"].Value = (int)Math.Max(0, Math.Min(80, Cal.BlackLift * 1000));
+                _tb["g_r"].Value = (int)Math.Max(88, Math.Min(112, Cal.GainR * 100));
+                _tb["g_g"].Value = (int)Math.Max(88, Math.Min(112, Cal.GainG * 100));
+                _tb["g_b"].Value = (int)Math.Max(88, Math.Min(112, Cal.GainB * 100));
+            }
+            finally { _syncSliders = false; }
             _curvePrev.Invalidate();
             UpdateValueLabels();
         }
@@ -825,7 +884,7 @@ namespace ColorMatch
                 }
             }
 
-            var ramp = Win.BuildRamp(Cal.Gamma, Cal.BrightMult, Cal.BlackLift, Cal.GainR, Cal.GainG, Cal.GainB);
+            var ramp = Cal.Ramp();
             Pen[] pens = { new Pen(Color.FromArgb(235, 110, 110), 1.6f),
                            new Pen(Color.FromArgb(120, 225, 130), 1.6f),
                            new Pen(Color.FromArgb(120, 150, 245), 1.6f) };
@@ -1189,7 +1248,7 @@ namespace ColorMatch
 
             var bSave = btn("Salvar perfil", 124);
             bSave.Accent = true;
-            bSave.Click += (s, e) => { SaveProfile(true); };
+            bSave.Click += (s, e) => { EditouPerfil(null); SaveProfile(true); };
             tb.Controls.Add(bSave);
 
             var bRestore = btn("Ler do monitor", 140);
@@ -1566,6 +1625,7 @@ namespace ColorMatch
 
         void ReloadFromHardware()
         {
+            EditouPerfil(null);
             bool cur = prof.UseSoftwareCurve;
             foreach (var p in panels)
             {
@@ -1626,6 +1686,7 @@ namespace ColorMatch
 
         void EqualizeDdc()
         {
+            EditouPerfil(null);
             int refIdx = _refIdx;
             if (refIdx < 0 || displays == null || refIdx >= displays.Count) return;
             var refDs = displays[refIdx];
@@ -1685,6 +1746,7 @@ namespace ColorMatch
             new PerfilMac("Generic Gray 2.2",      1.00, "gamma efetivo 2.2"),
             new PerfilMac("Generic Gray",          1.22, "gamma efetivo 1.8"),
             new PerfilMac("ProPhoto RGB",          1.22, "gamma efetivo 1.8"),
+            new PerfilMac("LG FULL HD (macOS)",    0.89, "ICC γ1.96 · compensa p/ sRGB"),
         };
 
         void AbrirMenuPerfis()
@@ -1782,6 +1844,7 @@ namespace ColorMatch
             }
             prof.Id = src.Id;
             prof.Name = src.Name;
+            prof.Editavel = src.Editavel;
             prof.UseSoftwareCurve = src.UseSoftwareCurve;
             SaveProfile(false);
             AtualizarPerfilTexto(true);
@@ -1825,7 +1888,78 @@ namespace ColorMatch
                 m.Items.Add(it);
             }
 
+            m.Items.Add(new ToolStripSeparator());
+
+            var cabIcc = item("PERFIS ICC IMPORTADOS");
+            cabIcc.Enabled = false;
+            cabIcc.ForeColor = Theme.Muted;
+            m.Items.Add(cabIcc);
+
+            var iccs = Icc.Listar();
+            if (iccs.Count == 0)
+            {
+                var vazio = item("(nenhum — use \"Importar perfil ICC\")");
+                vazio.Enabled = false;
+                vazio.ForeColor = Theme.Muted;
+                m.Items.Add(vazio);
+            }
+            foreach (var ic in iccs)
+            {
+                var it = item(ic.Nome + "   ·   " + ic.Detalhe);
+                if (("ICC: " + ic.Nome) == mp.PresetAtual) it.Font = new Font(m.Font, FontStyle.Bold);
+                var perfilIcc = ic;
+                var painel = mp;
+                it.Click += (s, e) => AplicarIccEm(painel, perfilIcc);
+                m.Items.Add(it);
+            }
+            var importar = item("Importar perfil ICC...");
+            importar.Click += (s, e) => ImportarIcc(mp);
+            m.Items.Add(importar);
+
             m.Show(ancora, new Point(0, ancora.Height + 2));
+        }
+
+        void AplicarIccEm(MonitorPanel mp, IccPerfil icc)
+        {
+            if (mp == null || icc == null || !icc.Ok) return;
+
+            // vira perfil de trabalho: não altera um perfil salvo na lista
+            prof.Id = "";
+            prof.Name = "Calibração atual";
+            prof.Editavel = false;
+            mp.AplicarIcc(icc);
+            SaveProfile(false);
+            AtualizarPerfilTexto(true);
+            _status.Text = "Perfil ICC \"" + icc.Nome + "\" aplicado só no " + mp.MarcaTexto() + ".";
+            ProfileStore.Log("ICC " + icc.Nome + " aplicado em " + mp.Display.DeviceName +
+                " (gama " + icc.Gamma + ")");
+        }
+
+        void ImportarIcc(MonitorPanel mp)
+        {
+            using (var d = new OpenFileDialog())
+            {
+                d.Title = "Importar perfil ICC";
+                d.Filter = "Perfis ICC (*.icc;*.icm)|*.icc;*.icm|Todos os arquivos (*.*)|*.*";
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                try
+                {
+                    string destino = Icc.Importar(d.FileName);
+                    var icc = Icc.Ler(destino);
+                    if (icc == null || !icc.Ok)
+                    {
+                        MessageBox.Show("Não consegui ler este perfil ICC.\n" +
+                            (icc == null ? "" : icc.Erro), "ColorMatch", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    AplicarIccEm(mp, icc);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Falha ao importar o ICC:\n" + ex.Message,
+                        "ColorMatch", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
         }
 
         void AplicarMacEm(MonitorPanel mp, PerfilMac pm)
@@ -1835,6 +1969,7 @@ namespace ColorMatch
             // vira perfil de trabalho: não altera um perfil salvo na lista
             prof.Id = "";
             prof.Name = "Calibração atual";
+            prof.Editavel = false;
             mp.AplicarPredefinicao(pm.Curva, pm.Nome);
             SaveProfile(false);
             AtualizarPerfilTexto(true);
@@ -1862,6 +1997,7 @@ namespace ColorMatch
             var novo = prof.Clone();
             novo.Name = nome;
             novo.Id = existente != null ? existente.Id : Guid.NewGuid().ToString("N");
+            novo.Editavel = existente != null ? existente.Editavel : false;
             ProfileLibrary.Save(novo);
             prof.Id = novo.Id;
             prof.Name = novo.Name;
@@ -1940,11 +2076,70 @@ namespace ColorMatch
                 p.Cal.FriendlyName = p.Display.FriendlyName;
             }
             ProfileStore.Save(prof);
-            // se o perfil ativo veio da lista, mantém a cópia da biblioteca em dia
-            if (!string.IsNullOrEmpty(prof.Id))
+            // original protegido NUNCA é sobrescrito; só cópias de trabalho (Editavel) sincronizam
+            if (!string.IsNullOrEmpty(prof.Id) && prof.Editavel)
                 try { ProfileLibrary.Save(prof); } catch { }
             _profStamp = System.IO.File.GetLastWriteTimeUtc(ProfileStore.ProfilePath);
             if (talk) MessageBox.Show("Perfil salvo em: " + ProfileStore.ProfilePath);
+        }
+
+        // chamado antes de qualquer edição do usuário: se o perfil ativo é um original
+        // (ou se veio de uma predefinição), cria automaticamente uma cópia e passa a
+        // editar a cópia — o original nunca é sobrescrito.
+        public void EditouPerfil(MonitorPanel origem)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(prof.Id) && prof.Editavel) return;   // já é cópia
+
+                Profile original = null;
+                string nomeBase = null;
+                if (!string.IsNullOrEmpty(prof.Id))
+                {
+                    original = ProfileLibrary.FindById(prof.Id);
+                    if (original == null) return;
+                    nomeBase = original.Name;
+                }
+                else
+                {
+                    MonitorPanel o = origem;
+                    if (o == null)
+                        foreach (var p in panels)
+                            if (!string.IsNullOrEmpty(p.PresetAtual)) { o = p; break; }
+                    if (o == null || string.IsNullOrEmpty(o.PresetAtual)) return;
+                    nomeBase = o.PresetAtual;
+                    if (nomeBase.StartsWith("ICC: ")) nomeBase = nomeBase.Substring(5);
+                }
+
+                var copia = prof.Clone();
+                copia.Id = Guid.NewGuid().ToString("N");
+                copia.Name = NomeCopia(nomeBase);
+                copia.Editavel = true;
+                ProfileLibrary.Save(copia);
+
+                prof.Id = copia.Id;
+                prof.Name = copia.Name;
+                prof.Editavel = true;
+                SaveProfile(false);
+                AtualizarPerfilTexto(true);
+                _status.Text = "Edição criou a cópia \"" + copia.Name + "\". " +
+                    (original != null ? "O original \"" + original.Name + "\" ficou intacto." : "A predefinição ficou intacta.");
+                ProfileStore.Log("edição: cópia \"" + copia.Name + "\" criada" +
+                    (original != null ? " de \"" + original.Name + "\"" : " a partir da predefinição"));
+            }
+            catch (Exception ex) { ProfileStore.Log("EditouPerfil: " + ex.Message); }
+        }
+
+        string NomeCopia(string baseNome)
+        {
+            string nome = baseNome + " (editado)";
+            if (ProfileLibrary.FindByName(nome) == null) return nome;
+            for (int i = 2; i < 1000; i++)
+            {
+                string n = baseNome + " (editado " + i + ")";
+                if (ProfileLibrary.FindByName(n) == null) return n;
+            }
+            return baseNome + " (editado " + DateTime.Now.ToString("HHmmss") + ")";
         }
 
         // se o .xml mudou no disco (por ex. você salvou outro perfil), o vigia passa a usar o novo
@@ -1968,6 +2163,7 @@ namespace ColorMatch
                 if (chkTray != null) chkTray.Checked = saved.InvisibleMode;
                 prof.Name = saved.Name;
                 prof.Id = saved.Id;
+                prof.Editavel = saved.Editavel;
                 prof.UseSoftwareCurve = saved.UseSoftwareCurve;
                 prof.InvisibleMode = saved.InvisibleMode;
                 prof.AutoStart = saved.AutoStart;
@@ -2090,6 +2286,16 @@ namespace ColorMatch
             catch { }
             ProfileStore.Log("ordem dos cartões salva: " + sb);
             _status.Text = "ordem salva.";
+        }
+
+        public void AbrirFiltro(MonitorPanel p)
+        {
+            if (p == null) return;
+            try
+            {
+                using (var f = new FilterForm(p)) f.ShowDialog(this);
+            }
+            catch (Exception ex) { ProfileStore.Log("filtro: erro " + ex); }
         }
 
         public void AbrirOsd(MonitorPanel p)

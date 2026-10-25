@@ -37,6 +37,23 @@ namespace ColorMatch
         public double GainG = 1.0;
         public double GainB = 1.0;
 
+        // filtro de cor (aplicado em cima dos ganhos calibrados)
+        public double Temp = 0.0;       // -1 frio (azul) .. +1 quente (vermelho)
+        public double Tint = 0.0;       // -1 verde .. +1 magenta
+        public int Saturation = -1;     // DDC VCP 0x8A; -1 = não aplicado / sem suporte
+
+        [System.Xml.Serialization.XmlIgnore]
+        public double GainREfetivo { get { return GainR * (1.0 + 0.15 * Temp + 0.04 * Tint); } }
+        [System.Xml.Serialization.XmlIgnore]
+        public double GainGEfetivo { get { return GainG * (1.0 - 0.12 * Tint); } }
+        [System.Xml.Serialization.XmlIgnore]
+        public double GainBEffetivo { get { return GainB * (1.0 - 0.15 * Temp + 0.04 * Tint); } }
+
+        public short[] Ramp()
+        {
+            return Win.BuildRamp(Gamma, BrightMult, BlackLift, GainREfetivo, GainGEfetivo, GainBEffetivo);
+        }
+
         // outros controles do OSD (DDC/CI) que o usuário mexeu: código VCP -> valor
         public List<VcpValor> Extras = new List<VcpValor>();
 
@@ -55,6 +72,7 @@ namespace ColorMatch
             RedGain = c.RedGain; GreenGain = c.GreenGain; BlueGain = c.BlueGain;
             Gamma = c.Gamma; BrightMult = c.BrightMult; BlackLift = c.BlackLift;
             GainR = c.GainR; GainG = c.GainG; GainB = c.GainB;
+            Temp = c.Temp; Tint = c.Tint; Saturation = c.Saturation;
             Extras = new List<VcpValor>();
             if (c.Extras != null)
                 foreach (var v in c.Extras) Extras.Add(new VcpValor(v.Codigo, v.Valor));
@@ -75,6 +93,7 @@ namespace ColorMatch
     {
         public string Name = "Perfil";
         public string Id = "";               // "" = perfil de trabalho (profile.xml); senão é um perfil da biblioteca
+        public bool Editavel = false;        // false = original protegido (editar cria cópia); true = cópia de trabalho
         public bool UseSoftwareCurve = true;
         public bool InvisibleMode = false;   // sem ícone na bandeja (rodar 100% invisível)
         public bool AutoStart = false;       // inicia junto com o Windows (repara a entrada do registro se sumir)
@@ -85,7 +104,7 @@ namespace ColorMatch
         {
             var n = new Profile();
             n.Name = Name; n.Id = Id; n.UseSoftwareCurve = UseSoftwareCurve;
-            n.InvisibleMode = InvisibleMode; n.AutoStart = AutoStart;
+            n.InvisibleMode = InvisibleMode; n.AutoStart = AutoStart; n.Editavel = Editavel;
             n.Monitors = new List<MonitorCal>();
             foreach (var m in Monitors)
             {
@@ -312,6 +331,14 @@ namespace ColorMatch
         {
             if (string.IsNullOrEmpty(id)) return null;
             foreach (var p in List()) if (p.Id == id) return p;
+            return null;
+        }
+
+        public static Profile FindByName(string nome)
+        {
+            if (string.IsNullOrEmpty(nome)) return null;
+            foreach (var p in List())
+                if (string.Equals(p.Name, nome, System.StringComparison.CurrentCultureIgnoreCase)) return p;
             return null;
         }
 

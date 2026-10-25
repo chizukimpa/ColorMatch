@@ -2,7 +2,7 @@
 
 > Iguala cor e brilho entre monitores no Windows.
 
-**Versão atual: 1.3.1** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
+**Versão atual: 1.4.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
 
 ## Sobre
 
@@ -31,9 +31,18 @@ Desenvolvido para rodar **100% invisível** (sem ícone na bandeja) e **sem UAC/
   e ele já aparece na lista; dá para aplicar, renomear e excluir.
 - **Predefinições por monitor**: cada cartão tem a lista **Predefinição** com os perfis do
   macOS (sRGB IEC61966-2.1, Display P3, Adobe RGB (1998), Apple RGB, Generic RGB,
-  Generic Gray 2.2, Generic Gray e ProPhoto RGB). Ela mostra a predefinição ativa daquele
-  monitor e aplica **só nele**, mudando **só a curva de gamma**; brilho/contraste/ganhos
-  calibrados são mantidos.
+  Generic Gray 2.2, Generic Gray, ProPhoto RGB e LG FULL HD) e os **perfis ICC importados**.
+  Ela mostra a predefinição ativa daquele monitor e aplica **só nele**, mudando **só a
+  curva de gamma**; brilho/contraste/ganhos calibrados são mantidos.
+- **Importar ICC**: "Importar perfil ICC..." lê a curva (TRC) do perfil e aplica a
+  compensação que o macOS faria (perfil γ1.96 vira curva 0.89, por exemplo). As primárias
+  (gamut) não são reproduzíveis por LUT; perfis com `vcgt` são avisados. Os arquivos ficam
+  em `%APPDATA%\ColorMatch\icc\`.
+- **Filtro de cor por monitor**: temperatura (frio ↔ quente, azul ↔ vermelho) e matiz
+  (verde ↔ magenta) direto na LUT; **saturação** via DDC/CI (VCP 0x8A) quando o monitor
+  expõe esse controle (senão, use o OSD do monitor).
+- **Originais protegidos**: editar um perfil salvo ou uma predefinição cria automaticamente
+  uma cópia (**"nome (editado)"**); o original nunca é sobrescrito.
 - **Abertura instantânea**: o DDC/CI é lido em segundo plano depois que a janela aparece
   (monitor lento não segura mais a abertura).
 - **Reordenar cartões** arrastando o cabeçalho; a ordem fica salva no perfil.
@@ -113,6 +122,10 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 
 ## Histórico
 
+- **1.4.0** — importação de perfis **ICC** (curva/TRC, preset "LG FULL HD (macOS)"); **filtro
+  de cor** por monitor (temperatura frio/quente, matiz verde/magenta e saturação por DDC
+  quando o monitor suporta); **originais protegidos** (editar um perfil salvo/predefinição
+  cria "nome (editado)" e nunca sobrescreve o original).
 - **1.3.1** — a predefinição virou uma **lista visível em cada cartão** (mostra a predefinição
   ativa e aplica sem confirmação); dica fixa explicando que o cartão é um monitor e o
   "Perfil" do topo vale para os dois.
