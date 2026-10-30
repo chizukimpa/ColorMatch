@@ -7,7 +7,7 @@ if not exist "%CSC%" set CSC=%WINDIR%\Microsoft.NET\Framework\v4.0.30319\csc.exe
  /out:ColorMatch.exe^
  /win32icon:src\app.ico^
  /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.dll^
- src\Api.cs src\Profiles.cs src\MonitorDb.cs src\Ui.cs src\Osd.cs src\Icc.cs src\App.cs
+ src\Api.cs src\Profiles.cs src\MonitorDb.cs src\Ui.cs src\Osd.cs src\Icc.cs src\BuiltinThemes.cs src\App.cs
 if errorlevel 1 (
   echo.
   echo COMPILHACAO FALHOU

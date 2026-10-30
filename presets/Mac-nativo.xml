@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Profile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Name>Mac (nativo)</Name>
+  <Id>macnativo0000000000000000000001</Id>
+  <Editavel>false</Editavel>
+  <UseSoftwareCurve>true</UseSoftwareCurve>
+  <InvisibleMode>false</InvisibleMode>
+  <AutoStart>false</AutoStart>
+  <Monitors>
+    <MonitorCal>
+      <MonitorId>MONITOR\AOCB501\{4d36e96e-e325-11ce-bfc1-08002be10318}\0002</MonitorId>
+      <DeviceName />
+      <FriendlyName>24G50F</FriendlyName>
+      <Ordem>0</Ordem>
+      <Brightness>62</Brightness>
+      <Contrast>54</Contrast>
+      <RedGain>51</RedGain>
+      <GreenGain>53</GreenGain>
+      <BlueGain>68</BlueGain>
+      <Gamma>0.81</Gamma>
+      <BrightMult>1</BrightMult>
+      <BlackLift>0</BlackLift>
+      <GainR>1</GainR>
+      <GainG>1</GainG>
+      <GainB>1</GainB>
+      <Temp>0</Temp>
+      <Tint>0</Tint>
+      <Saturation>-1</Saturation>
+      <Extras />
+    </MonitorCal>
+    <MonitorCal>
+      <MonitorId>MONITOR\ACR0B70\{4d36e96e-e325-11ce-bfc1-08002be10318}\0003</MonitorId>
+      <DeviceName />
+      <FriendlyName>KA242Y E</FriendlyName>
+      <Ordem>1</Ordem>
+      <Brightness>75</Brightness>
+      <Contrast>55</Contrast>
+      <RedGain>50</RedGain>
+      <GreenGain>50</GreenGain>
+      <BlueGain>50</BlueGain>
+      <Gamma>0.81</Gamma>
+      <BrightMult>1</BrightMult>
+      <BlackLift>0</BlackLift>
+      <GainR>1</GainR>
+      <GainG>1</GainG>
+      <GainB>1</GainB>
+      <Temp>0</Temp>
+      <Tint>0</Tint>
+      <Saturation>-1</Saturation>
+      <Extras />
+    </MonitorCal>
+  </Monitors>
+</Profile>

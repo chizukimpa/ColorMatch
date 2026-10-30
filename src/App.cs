@@ -14,7 +14,7 @@ namespace ColorMatch
     static class Program
     {
         // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
-        public const string Versao = "1.4.0";
+        public const string Versao = "1.5.0";
 
         [STAThread]
         static void Main(string[] args)
@@ -39,6 +39,9 @@ namespace ColorMatch
                     " — CLR " + Environment.Version + " — " + (Environment.Is64BitProcess ? "64" : "32") + " bits");
             }
             catch { }
+
+            // temas que acompanham o app (ex.: "Mac (nativo)") entram na lista de perfis
+            BuiltinThemes.Seed();
 
             // /aplicar: aplica o perfil salvo e sai. Não usa o mutex — pode rodar
             // mesmo com o app já aberto (é só uma escrita de DDC + curva).
@@ -1735,17 +1738,19 @@ namespace ColorMatch
         }
 
         // perfis que acompanham o macOS (a curva é o que dá para reproduzir via LUT;
-        // primárias/white point não são representáveis numa LUT por canal)
+        // primárias/white point não são representáveis numa LUT por canal).
+        // Curva = gama do perfil / 2.2 (a mesma conta do Icc.cs): γ1.8 -> 0.82 (escurece
+        // os meios-tons), γ2.2 -> 1.00 (identidade).
         static readonly PerfilMac[] MacPerfis = new PerfilMac[]
         {
             new PerfilMac("sRGB IEC61966-2.1",    1.00, "gamma efetivo 2.2"),
             new PerfilMac("Display P3",            1.00, "gamma 2.2; primárias P3 não reproduzíveis"),
             new PerfilMac("Adobe RGB (1998)",      1.00, "gamma 2.2"),
-            new PerfilMac("Apple RGB",             1.22, "gamma efetivo 1.8"),
-            new PerfilMac("Generic RGB",           1.22, "gamma efetivo 1.8"),
+            new PerfilMac("Apple RGB",             0.82, "γ1.8 compensado para sRGB"),
+            new PerfilMac("Generic RGB",           0.82, "γ1.8 compensado para sRGB"),
             new PerfilMac("Generic Gray 2.2",      1.00, "gamma efetivo 2.2"),
-            new PerfilMac("Generic Gray",          1.22, "gamma efetivo 1.8"),
-            new PerfilMac("ProPhoto RGB",          1.22, "gamma efetivo 1.8"),
+            new PerfilMac("Generic Gray",          0.82, "γ1.8 compensado para sRGB"),
+            new PerfilMac("ProPhoto RGB",          0.82, "γ1.8 compensado para sRGB"),
             new PerfilMac("LG FULL HD (macOS)",    0.89, "ICC γ1.96 · compensa p/ sRGB"),
         };
 

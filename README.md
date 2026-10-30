@@ -2,7 +2,7 @@
 
 > Iguala cor e brilho entre monitores no Windows.
 
-**Versão atual: 1.4.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
+**Versão atual: 1.5.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
 
 ## Sobre
 
@@ -41,6 +41,12 @@ Desenvolvido para rodar **100% invisível** (sem ícone na bandeja) e **sem UAC/
 - **Filtro de cor por monitor**: temperatura (frio ↔ quente, azul ↔ vermelho) e matiz
   (verde ↔ magenta) direto na LUT; **saturação** via DDC/CI (VCP 0x8A) quando o monitor
   expõe esse controle (senão, use o OSD do monitor).
+- **Tema "Mac (nativo)" embutido**: predefinição pronta que reproduz o visual capturado no
+  macOS 26.7 com os mesmos dois monitores (perfil ativo **Generic RGB**, γ1.80, LUT do
+  sistema em identidade). Fica na lista **Perfil** já na primeira execução: AOC 24G50F
+  62/54 com ganhos 51/53/68, Acer KA242Y E 75/55 com 50/50/50 e **Gamma 0,81** nos dois
+  (cinza 50% = 0,427, o mesmo que o macOS manda para a tela). É original protegido:
+  editar cria "Mac (nativo) (editado)".
 - **Originais protegidos**: editar um perfil salvo ou uma predefinição cria automaticamente
   uma cópia (**"nome (editado)"**); o original nunca é sobrescrito.
 - **Abertura instantânea**: o DDC/CI é lido em segundo plano depois que a janela aparece
@@ -115,6 +121,34 @@ digitalmente; o app instalado pelo setup já fica sem essa marca.
 novo pelo atalho: a segunda execução pede para a primeira mostrar a janela. Se ainda assim
 não abrir, veja o log em `%APPDATA%\ColorMatch\apply.log`.
 
+## Tema "Mac (nativo)"
+
+Predefinição que reproduz o visual do macOS 26.7 nos dois monitores (AOC 24G50F +
+Acer KA242Y E), capturado em 29/10/2026 com eles ligados no Mac:
+
+| | AOC 24G50F | Acer KA242Y E |
+|---|---|---|
+| DDC brilho/contraste | 62 / 54 | 75 / 55 |
+| Ganhos R/G/B | 51 / 53 / 68 | 50 / 50 / 50 |
+| Gamma (curva) | 0,81 | 0,81 |
+| Origem | perfil ativo **Generic RGB** (γ1.80), LUT do sistema em identidade | idem |
+
+A conta é a mesma do `Icc.cs`: a curva do perfil aplicada sobre linear sRGB deixa o cinza
+50% em **0,427** (o app chega em 0,4270 com Gamma 0,81). A partir da 1.5.0 o tema entra
+sozinho na lista **Perfil** na primeira execução.
+
+Sem recompilar nada, dá para instalar só o perfil (vale para a 1.4.0 também):
+
+```bat
+copy presets\Mac-nativo.xml "%APPDATA%\ColorMatch\perfis\"
+```
+
+Depois reabra o ColorMatch e escolha **"Mac (nativo)"** na lista Perfil.
+
+**Limite:** uma LUT por canal reproduz a curva (contraste/gamma) e o ponto branco; as
+primárias (gamut) do perfil não são reproduzíveis — a saturação extra do macOS não vem
+junto. Se o monitor estiver em outro perfil de cor no Mac, o tema não corresponde.
+
 ## Calibração
 
 Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
@@ -122,6 +156,13 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 
 ## Histórico
 
+- **1.5.0** — tema embutido **"Mac (nativo)"**: captura do visual do macOS 26.7 nos dois
+  monitores (perfil Generic RGB γ1.80 + LUT identidade) traduzida para o app — Gamma 0,81
+  (cinza 50% = 0,427) e o DDC que já estava gravado neles (AOC 62/54 ganhos 51/53/68; Acer
+  75/55 ganhos 50/50/50). Corrige também a direção das predefinições de γ1.8 (Apple RGB,
+  Generic RGB, Generic Gray, ProPhoto): agora **escurecem** os meios-tons como o macOS faz
+  (antes usavam 1.22, que clareava). As primárias (gamut) continuam fora do alcance de uma
+  LUT por canal.
 - **1.4.0** — importação de perfis **ICC** (curva/TRC, preset "LG FULL HD (macOS)"); **filtro
   de cor** por monitor (temperatura frio/quente, matiz verde/magenta e saturação por DDC
   quando o monitor suporta); **originais protegidos** (editar um perfil salvo/predefinição
@@ -149,6 +190,8 @@ src/
   MonitorDb.cs  - banco de monitores (auto-identificação)
   Ui.cs         - tema e controles modernos
   Osd.cs        - janela OSD avançada
+  Icc.cs        - leitura de perfis ICC (TRC/vcgt)
+  BuiltinThemes.cs - temas embutidos (Mac nativo)
   App.cs        - janela principal, vigilância, arrasto
 build.cmd
 build_installer.cmd
