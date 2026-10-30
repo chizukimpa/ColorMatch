@@ -611,9 +611,7 @@ namespace ColorMatch
             Win.WriteVCP(h, Win.VCP_RED_GAIN, (uint)_cal.RedGain);
             Win.WriteVCP(h, Win.VCP_GREEN_GAIN, (uint)_cal.GreenGain);
             Win.WriteVCP(h, Win.VCP_BLUE_GAIN, (uint)_cal.BlueGain);
-            int n = 0;
-            if (_cal.Extras != null)
-                foreach (var v in _cal.Extras) { if (Win.WriteVCP(h, v.Codigo, (uint)v.Valor)) n++; }
+            int n = Win.ApplyExtras(h, _cal.Extras);
             _status.Text = "perfil reposto (" + (5 + n) + " valores).";
             _status.ForeColor = Theme.Good;
             Carregar();

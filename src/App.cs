@@ -116,6 +116,7 @@ namespace ColorMatch
                 Win.AttachPhysical(ds);
                 try
                 {
+                    Win.ApplyExtras(ds.PhysicalHandle, c.Extras);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BRIGHTNESS, (uint)c.Brightness);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_CONTRAST, (uint)c.Contrast);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
@@ -136,6 +137,7 @@ namespace ColorMatch
             foreach (var ds in displays)
             {
                 var c = ds.Cal != null ? ds.Cal : prof.GetByMonitorId(ds.MonitorId, ds.DeviceName);
+                Win.ApplyExtras(ds.PhysicalHandle, c.Extras);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BRIGHTNESS, (uint)c.Brightness);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_CONTRAST, (uint)c.Contrast);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
@@ -708,6 +710,13 @@ namespace ColorMatch
             Win.WriteVCP(h, Win.VCP_GREEN_GAIN, (uint)Cal.GreenGain);
             Win.WriteVCP(h, Win.VCP_BLUE_GAIN, (uint)Cal.BlueGain);
             if (Cal.Saturation >= 0) Win.WriteVCP(h, 0x8A, (uint)Cal.Saturation);
+        }
+
+        // extras do OSD (preset de cor, níveis de preto...) — lento (lê antes de
+        // escrever), então só roda ao aplicar um perfil, não a cada slider
+        void PushExtras()
+        {
+            Win.ApplyExtras(H(), Cal.Extras);
         }
 
         void ApplyCurve()
@@ -1843,6 +1852,7 @@ namespace ColorMatch
                 p.Cal.CopyValuesFrom(c);
                 p.SyncSliders();
                 p.LimparPreset();
+                CallPrivate(p, "PushExtras");
                 CallPrivate(p, "PushDdcAll");
                 CallPrivate(p, "ApplyCurve");
                 n++;
@@ -2187,6 +2197,7 @@ namespace ColorMatch
                 var c = saved.GetByMonitorId(p.Display.MonitorId, p.Display.DeviceName);
                 p.CopyCalFrom(c);
                 p.SyncSliders();
+                CallPrivate(p, "PushExtras");
                 CallPrivate(p, "PushDdcAll");
                 CallPrivate(p, "ApplyCurve");
             }

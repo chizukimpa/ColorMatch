@@ -130,12 +130,17 @@ Acer KA242Y E), capturado em 29/10/2026 com eles ligados no Mac:
 |---|---|---|
 | DDC brilho/contraste | 62 / 54 | 75 / 55 |
 | Ganhos R/G/B | 51 / 53 / 68 | 50 / 50 / 50 |
+| OSD (VCP) | preset **Usuário** (0x14=11), preto R/B 50 (0x6C/0x6E) | idem |
 | Gamma (curva) | 0,81 | 0,81 |
 | Origem | perfil ativo **Generic RGB** (γ1.80), LUT do sistema em identidade | idem |
 
 A conta é a mesma do `Icc.cs`: a curva do perfil aplicada sobre linear sRGB deixa o cinza
 50% em **0,427** (o app chega em 0,4270 com Gamma 0,81). A partir da 1.5.0 o tema entra
 sozinho na lista **Perfil** na primeira execução.
+
+O tema também carrega os controles do **OSD** lidos por DDC/CI (preset de cor e níveis de
+preto); ao aplicar o perfil o app reescreve só o que estiver diferente — e escreve o preset
+antes de brilho/ganhos, porque trocar o preset reinicializa esses valores no monitor.
 
 Sem recompilar nada, dá para instalar só o perfil (vale para a 1.4.0 também):
 
@@ -158,11 +163,13 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 
 - **1.5.0** — tema embutido **"Mac (nativo)"**: captura do visual do macOS 26.7 nos dois
   monitores (perfil Generic RGB γ1.80 + LUT identidade) traduzida para o app — Gamma 0,81
-  (cinza 50% = 0,427) e o DDC que já estava gravado neles (AOC 62/54 ganhos 51/53/68; Acer
-  75/55 ganhos 50/50/50). Corrige também a direção das predefinições de γ1.8 (Apple RGB,
-  Generic RGB, Generic Gray, ProPhoto): agora **escurecem** os meios-tons como o macOS faz
-  (antes usavam 1.22, que clareava). As primárias (gamut) continuam fora do alcance de uma
-  LUT por canal.
+  (cinza 50% = 0,427) e o DDC/OSD que já estava gravado neles (AOC 62/54 ganhos 51/53/68;
+  Acer 75/55 ganhos 50/50/50; preset de cor 0x14=11 e níveis de preto 0x6C/0x6E=50).
+  Aplicar um perfil agora **reaplica os extras do OSD** (só os seguros, e só se estiverem
+  diferentes), sempre antes de brilho/contraste/ganhos. Corrige também a direção das
+  predefinições de γ1.8 (Apple RGB, Generic RGB, Generic Gray, ProPhoto): agora
+  **escurecem** os meios-tons como o macOS faz (antes usavam 1.22, que clareava). As
+  primárias (gamut) continuam fora do alcance de uma LUT por canal.
 - **1.4.0** — importação de perfis **ICC** (curva/TRC, preset "LG FULL HD (macOS)"); **filtro
   de cor** por monitor (temperatura frio/quente, matiz verde/magenta e saturação por DDC
   quando o monitor suporta); **originais protegidos** (editar um perfil salvo/predefinição

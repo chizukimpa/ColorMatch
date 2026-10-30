@@ -9,6 +9,8 @@
 //     equivale a Gamma 0.81 no ColorMatch (mesma conta do Icc.cs)
 //   - DDC/CI que já estava gravado nos monitores: AOC 62/54 com ganhos 51/53/68;
 //     Acer 75/55 com ganhos 50/50/50
+//   - OSD (VCP) lido na sessão: preset de cor 0x14 = 11 (Usuário), níveis de preto
+//     0x6C/0x6E = 50 nos dois. Ficam em Extras e são reaplicados junto com o perfil.
 //
 // O tema é semeado uma única vez na biblioteca de perfis; se o usuário excluir,
 // ele não volta sozinho (a marca fica em temas.txt). Ao subir a versão do tema,
@@ -24,7 +26,7 @@ namespace ColorMatch
         const string MarcaArquivo = "temas.txt";
 
         const string MacId = "macnativo0000000000000000000001";
-        const int MacVersao = 1;
+        const int MacVersao = 2;
 
         public static void Seed()
         {
@@ -103,6 +105,15 @@ namespace ColorMatch
             c.Tint = 0.0;
             c.Saturation = -1;
             c.Extras = new List<VcpValor>();
+
+            // OSD capturado por DDC/CI (VCP) nos dois monitores:
+            //   0x14 = 11  -> preset de cor "Usuário" (não sRGB/6500K)
+            //   0x6C = 50  -> nível de preto: vermelho (neutro)
+            //   0x6E = 50  -> nível de preto: azul (neutro)
+            // Gravados assim o monitor volta ao mesmo estado do OSD que estava no Mac.
+            c.Extras.Add(new VcpValor(0x14, 11));
+            c.Extras.Add(new VcpValor(0x6C, 50));
+            c.Extras.Add(new VcpValor(0x6E, 50));
             return c;
         }
     }

@@ -26,7 +26,20 @@
       <Temp>0</Temp>
       <Tint>0</Tint>
       <Saturation>-1</Saturation>
-      <Extras />
+      <Extras>
+        <VcpValor>
+          <Codigo>20</Codigo>
+          <Valor>11</Valor>
+        </VcpValor>
+        <VcpValor>
+          <Codigo>108</Codigo>
+          <Valor>50</Valor>
+        </VcpValor>
+        <VcpValor>
+          <Codigo>110</Codigo>
+          <Valor>50</Valor>
+        </VcpValor>
+      </Extras>
     </MonitorCal>
     <MonitorCal>
       <MonitorId>MONITOR\ACR0B70\{4d36e96e-e325-11ce-bfc1-08002be10318}\0003</MonitorId>
@@ -47,7 +60,20 @@
       <Temp>0</Temp>
       <Tint>0</Tint>
       <Saturation>-1</Saturation>
-      <Extras />
+      <Extras>
+        <VcpValor>
+          <Codigo>20</Codigo>
+          <Valor>11</Valor>
+        </VcpValor>
+        <VcpValor>
+          <Codigo>108</Codigo>
+          <Valor>50</Valor>
+        </VcpValor>
+        <VcpValor>
+          <Codigo>110</Codigo>
+          <Valor>50</Valor>
+        </VcpValor>
+      </Extras>
     </MonitorCal>
   </Monitors>
 </Profile>

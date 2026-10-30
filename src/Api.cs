@@ -219,6 +219,34 @@ namespace ColorMatch
         }
         public static bool WriteVCP(IntPtr h, byte code, uint val) { return h != IntPtr.Zero && SetVCPFeature(h, code, val); }
 
+        // extras do OSD que podem ser reaplicados sem risco: fora os 5 controles do
+        // cartão, a saturação (campo próprio), os perigosos (fonte de entrada / energia)
+        // e os códigos só de leitura ou de ação.
+        public static bool VcpExtraSeguro(byte code)
+        {
+            if (code == VCP_BRIGHTNESS || code == VCP_CONTRAST) return false;
+            if (code == VCP_RED_GAIN || code == VCP_GREEN_GAIN || code == VCP_BLUE_GAIN) return false;
+            if (code == 0x8A) return false;              // saturação já vai pelo campo Saturation
+            if (VcpPerigoso(code)) return false;
+            if (VcpEhLeitura(code) || VcpEhAcao(code)) return false;
+            return true;
+        }
+
+        // reescreve só o que estiver diferente (não re-inicializa o preset de cor à toa)
+        public static int ApplyExtras(IntPtr h, List<VcpValor> extras)
+        {
+            int n = 0;
+            if (h == IntPtr.Zero || extras == null) return 0;
+            foreach (var v in extras)
+            {
+                if (v == null || !VcpExtraSeguro(v.Codigo)) continue;
+                uint cur, max;
+                if (ReadVCP(h, v.Codigo, out cur, out max) && (int)cur == v.Valor) continue;
+                if (WriteVCP(h, v.Codigo, (uint)v.Valor)) n++;
+            }
+            return n;
+        }
+
         public static short[] ReadRamp(string deviceName)
         {
             IntPtr hdc = CreateDCW(null, deviceName, null, IntPtr.Zero);
