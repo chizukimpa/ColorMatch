@@ -130,7 +130,8 @@ Acer KA242Y E), capturado em 29/10/2026 com eles ligados no Mac:
 |---|---|---|
 | DDC brilho/contraste | 62 / 54 | 75 / 55 |
 | Ganhos R/G/B | 51 / 53 / 68 | 50 / 50 / 50 |
-| OSD (VCP) | preset **Usuário** (0x14=11), preto R/B 50 (0x6C/0x6E) | idem |
+| OSD (VCP) | preset **Usuário** (0x14=11), temperatura 0x0C=70, preto R/B 50 (0x6C/0x6E) | preset Usuário, 0x0C=35, preto R/B 50 |
+| Modo de tela | 1920×1080 @ 144 Hz | 1920×1080 @ 100 Hz |
 | Gamma (curva) | 0,81 | 0,81 |
 | Origem | perfil ativo **Generic RGB** (γ1.80), LUT do sistema em identidade | idem |
 
@@ -138,9 +139,12 @@ A conta é a mesma do `Icc.cs`: a curva do perfil aplicada sobre linear sRGB dei
 50% em **0,427** (o app chega em 0,4270 com Gamma 0,81). A partir da 1.5.0 o tema entra
 sozinho na lista **Perfil** na primeira execução.
 
-O tema também carrega os controles do **OSD** lidos por DDC/CI (preset de cor e níveis de
-preto); ao aplicar o perfil o app reescreve só o que estiver diferente — e escreve o preset
-antes de brilho/ganhos, porque trocar o preset reinicializa esses valores no monitor.
+O tema também carrega os controles do **OSD** lidos por DDC/CI (preset de cor, temperatura e
+níveis de preto); ao aplicar o perfil o app reescreve só o que estiver diferente — e escreve
+o preset antes de brilho/ganhos, porque trocar o preset reinicializa esses valores no monitor.
+O **modo de tela** (resolução + taxa) só é trocado se for diferente e se o driver aceitar o
+modo; se não existir, o atual é mantido. Escala (100%), rotação (0°) e SDR (8 bits) já são o
+padrão do Windows e o app não mexe nisso.
 
 Sem recompilar nada, dá para instalar só o perfil (vale para a 1.4.0 também):
 
@@ -164,7 +168,9 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 - **1.5.0** — tema embutido **"Mac (nativo)"**: captura do visual do macOS 26.7 nos dois
   monitores (perfil Generic RGB γ1.80 + LUT identidade) traduzida para o app — Gamma 0,81
   (cinza 50% = 0,427) e o DDC/OSD que já estava gravado neles (AOC 62/54 ganhos 51/53/68;
-  Acer 75/55 ganhos 50/50/50; preset de cor 0x14=11 e níveis de preto 0x6C/0x6E=50).
+  Acer 75/55 ganhos 50/50/50; preset de cor 0x14=11, temperatura 0x0C=70/35 e níveis de preto
+  0x6C/0x6E=50). O perfil também guarda o **modo de tela** (1920×1080 @ 144/100 Hz) e o aplica
+  só quando o driver aceita.
   Aplicar um perfil agora **reaplica os extras do OSD** (só os seguros, e só se estiverem
   diferentes), sempre antes de brilho/contraste/ganhos. Corrige também a direção das
   predefinições de γ1.8 (Apple RGB, Generic RGB, Generic Gray, ProPhoto): agora

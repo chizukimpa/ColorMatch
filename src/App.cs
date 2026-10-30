@@ -116,6 +116,7 @@ namespace ColorMatch
                 Win.AttachPhysical(ds);
                 try
                 {
+                    Win.ApplyMode(ds.DeviceName, c.Largura, c.Altura, c.TaxaHz);
                     Win.ApplyExtras(ds.PhysicalHandle, c.Extras);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BRIGHTNESS, (uint)c.Brightness);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_CONTRAST, (uint)c.Contrast);
@@ -137,6 +138,7 @@ namespace ColorMatch
             foreach (var ds in displays)
             {
                 var c = ds.Cal != null ? ds.Cal : prof.GetByMonitorId(ds.MonitorId, ds.DeviceName);
+                Win.ApplyMode(ds.DeviceName, c.Largura, c.Altura, c.TaxaHz);
                 Win.ApplyExtras(ds.PhysicalHandle, c.Extras);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BRIGHTNESS, (uint)c.Brightness);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_CONTRAST, (uint)c.Contrast);
@@ -1849,6 +1851,7 @@ namespace ColorMatch
             {
                 var c = src.Match(p.Display.MonitorId, p.Display.DeviceName);
                 if (c == null) { faltando++; continue; }
+                Win.ApplyMode(p.Display.DeviceName, c.Largura, c.Altura, c.TaxaHz);
                 p.Cal.CopyValuesFrom(c);
                 p.SyncSliders();
                 p.LimparPreset();
@@ -2195,6 +2198,7 @@ namespace ColorMatch
             foreach (var p in panels)
             {
                 var c = saved.GetByMonitorId(p.Display.MonitorId, p.Display.DeviceName);
+                Win.ApplyMode(p.Display.DeviceName, c.Largura, c.Altura, c.TaxaHz);
                 p.CopyCalFrom(c);
                 p.SyncSliders();
                 CallPrivate(p, "PushExtras");

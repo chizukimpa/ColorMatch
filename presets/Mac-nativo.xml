@@ -26,10 +26,17 @@
       <Temp>0</Temp>
       <Tint>0</Tint>
       <Saturation>-1</Saturation>
+      <Largura>1920</Largura>
+      <Altura>1080</Altura>
+      <TaxaHz>144</TaxaHz>
       <Extras>
         <VcpValor>
           <Codigo>20</Codigo>
           <Valor>11</Valor>
+        </VcpValor>
+        <VcpValor>
+          <Codigo>12</Codigo>
+          <Valor>70</Valor>
         </VcpValor>
         <VcpValor>
           <Codigo>108</Codigo>
@@ -60,10 +67,17 @@
       <Temp>0</Temp>
       <Tint>0</Tint>
       <Saturation>-1</Saturation>
+      <Largura>1920</Largura>
+      <Altura>1080</Altura>
+      <TaxaHz>100</TaxaHz>
       <Extras>
         <VcpValor>
           <Codigo>20</Codigo>
           <Valor>11</Valor>
+        </VcpValor>
+        <VcpValor>
+          <Codigo>12</Codigo>
+          <Valor>35</Valor>
         </VcpValor>
         <VcpValor>
           <Codigo>108</Codigo>

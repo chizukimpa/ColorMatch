@@ -26,7 +26,7 @@ namespace ColorMatch
         const string MarcaArquivo = "temas.txt";
 
         const string MacId = "macnativo0000000000000000000001";
-        const int MacVersao = 2;
+        const int MacVersao = 3;
 
         public static void Seed()
         {
@@ -71,17 +71,17 @@ namespace ColorMatch
             p.Monitors = new List<MonitorCal>();
 
             p.Monitors.Add(Cal("MONITOR\\AOCB501\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\0002",
-                "24G50F", 0, 62, 54, 51, 53, 68));
+                "24G50F", 0, 62, 54, 51, 53, 68, 144, 70));
 
             p.Monitors.Add(Cal("MONITOR\\ACR0B70\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\0003",
-                "KA242Y E", 1, 75, 55, 50, 50, 50));
+                "KA242Y E", 1, 75, 55, 50, 50, 50, 100, 35));
 
             return p;
         }
 
         // Gamma 0.81 = TRC γ1.80 do perfil "Generic RGB" do macOS compensada para sRGB
         static MonitorCal Cal(string monitorId, string nome, int ordem,
-            int brilho, int contraste, int ganhoR, int ganhoG, int ganhoB)
+            int brilho, int contraste, int ganhoR, int ganhoG, int ganhoB, int taxaHz, int tempOsd)
         {
             var c = new MonitorCal();
             c.MonitorId = monitorId;
@@ -106,12 +106,19 @@ namespace ColorMatch
             c.Saturation = -1;
             c.Extras = new List<VcpValor>();
 
+            // modo de tela capturado no macOS: 1920x1080, 1x, rotação 0, SDR
+            c.Largura = 1920;
+            c.Altura = 1080;
+            c.TaxaHz = taxaHz;
+
             // OSD capturado por DDC/CI (VCP) nos dois monitores:
             //   0x14 = 11  -> preset de cor "Usuário" (não sRGB/6500K)
+            //   0x0C = 70 (AOC) / 35 (Acer) -> temperatura de cor do OSD
             //   0x6C = 50  -> nível de preto: vermelho (neutro)
             //   0x6E = 50  -> nível de preto: azul (neutro)
             // Gravados assim o monitor volta ao mesmo estado do OSD que estava no Mac.
             c.Extras.Add(new VcpValor(0x14, 11));
+            c.Extras.Add(new VcpValor(0x0C, tempOsd));
             c.Extras.Add(new VcpValor(0x6C, 50));
             c.Extras.Add(new VcpValor(0x6E, 50));
             return c;

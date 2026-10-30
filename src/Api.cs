@@ -219,6 +219,111 @@ namespace ColorMatch
         }
         public static bool WriteVCP(IntPtr h, byte code, uint val) { return h != IntPtr.Zero && SetVCPFeature(h, code, val); }
 
+        // ---------- modo de tela (resolução / taxa de atualização) ----------
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct DEVMODE
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+            public short dmSpecVersion;
+            public short dmDriverVersion;
+            public short dmSize;
+            public short dmDriverExtra;
+            public int dmFields;
+            public int dmPositionX;
+            public int dmPositionY;
+            public int dmDisplayOrientation;
+            public int dmDisplayFixedOutput;
+            public short dmColor;
+            public short dmDuplex;
+            public short dmYResolution;
+            public short dmTTOption;
+            public short dmCollate;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel;
+            public int dmPelsWidth;
+            public int dmPelsHeight;
+            public int dmDisplayFlags;
+            public int dmDisplayFrequency;
+            public int dmICMMethod;
+            public int dmICMIntent;
+            public int dmMediaType;
+            public int dmDitherType;
+            public int dmReserved1;
+            public int dmReserved2;
+            public int dmPanningWidth;
+            public int dmPanningHeight;
+        }
+
+        const int ENUM_CURRENT_SETTINGS = -1;
+        const uint DM_BITSPERPEL = 0x00040000;
+        const uint DM_PELSWIDTH = 0x00080000;
+        const uint DM_PELSHEIGHT = 0x00100000;
+        const uint DM_DISPLAYFREQUENCY = 0x00400000;
+        const uint CDS_UPDATEREGISTRY = 0x00000001;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool EnumDisplaySettingsW(string deviceName, int modeNum, ref DEVMODE devMode);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern int ChangeDisplaySettingsExW(string deviceName, ref DEVMODE devMode, IntPtr hwnd, uint flags, IntPtr param);
+
+        public static DEVMODE CurrentMode(string deviceName)
+        {
+            var dm = new DEVMODE();
+            dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+            if (!EnumDisplaySettingsW(deviceName, ENUM_CURRENT_SETTINGS, ref dm)) return dm;
+            return dm;
+        }
+
+        // aplica resolução/taxa do perfil; 0 em qualquer campo = não mexer.
+        // devolve true se já estava igual ou se a troca foi aceita.
+        public static bool ApplyMode(string deviceName, int largura, int altura, int taxaHz)
+        {
+            if (string.IsNullOrEmpty(deviceName) || largura <= 0 || altura <= 0) return false;
+            try
+            {
+                var atual = CurrentMode(deviceName);
+                if (atual.dmPelsWidth == largura && atual.dmPelsHeight == altura &&
+                    (taxaHz <= 0 || atual.dmDisplayFrequency == taxaHz)) return true;
+
+                // procura o modo exato para herdar bits/cor/flags corretos do driver
+                var alvo = new DEVMODE();
+                bool achou = false;
+                for (int i = 0; i < 4096; i++)
+                {
+                    var t = new DEVMODE();
+                    t.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+                    if (!EnumDisplaySettingsW(deviceName, i, ref t)) break;
+                    if (t.dmPelsWidth != largura || t.dmPelsHeight != altura) continue;
+                    if (taxaHz > 0 && t.dmDisplayFrequency != taxaHz) continue;
+                    alvo = t; achou = true; break;
+                }
+                if (!achou)
+                {
+                    ProfileStore.Log("modo " + largura + "x" + altura + " @" + taxaHz +
+                        " Hz não existe em " + deviceName + " (mantido o atual)");
+                    return false;
+                }
+
+                alvo.dmFields = (int)(DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY);
+                int r = ChangeDisplaySettingsExW(deviceName, ref alvo, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+                if (r != 0)
+                {
+                    ProfileStore.Log("troca de modo recusada em " + deviceName + " (" + largura + "x" +
+                        altura + "@" + taxaHz + "): código " + r);
+                    return false;
+                }
+                ProfileStore.Log("modo aplicado em " + deviceName + ": " + largura + "x" + altura +
+                    (taxaHz > 0 ? "@" + taxaHz + "Hz" : ""));
+                return true;
+            }
+            catch (Exception e)
+            {
+                ProfileStore.Log("ApplyMode: " + e.Message);
+                return false;
+            }
+        }
+
         // extras do OSD que podem ser reaplicados sem risco: fora os 5 controles do
         // cartão, a saturação (campo próprio), os perigosos (fonte de entrada / energia)
         // e os códigos só de leitura ou de ação.
