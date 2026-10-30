@@ -158,6 +158,10 @@ Depois reabra o ColorMatch e escolha **"Mac (nativo)"** na lista Perfil.
 primárias (gamut) do perfil não são reproduzíveis — a saturação extra do macOS não vem
 junto. Se o monitor estiver em outro perfil de cor no Mac, o tema não corresponde.
 
+**Color Space do OSD:** no AOC, o menu do monitor tem `Color Space` (sRGB ↔ Native). Isso
+não é exposto por DDC/CI, então o app não lê nem escreve — se a esquerda ficar menos
+saturada, confira se está em **Native** (sRGB corta o gamut).
+
 ## Calibração
 
 Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
