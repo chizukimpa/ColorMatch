@@ -26,7 +26,7 @@ namespace ColorMatch
         const string MarcaArquivo = "temas.txt";
 
         const string MacId = "macnativo0000000000000000000001";
-        const int MacVersao = 3;
+        const int MacVersao = 6;
 
         public static void Seed()
         {
@@ -94,7 +94,7 @@ namespace ColorMatch
             c.GreenGain = ganhoG;
             c.BlueGain = ganhoB;
 
-            c.Gamma = 0.81;
+            c.Gamma = 1.0;
             c.BrightMult = 1.0;
             c.BlackLift = 0.0;
             c.GainR = 1.0;
@@ -104,6 +104,7 @@ namespace ColorMatch
             c.Temp = 0.0;
             c.Tint = 0.0;
             c.Saturation = -1;
+            c.GpuSaturation = 110;   // saturação AMD (ADLX): 100 = neutro
             c.Extras = new List<VcpValor>();
 
             // modo de tela capturado no macOS: 1920x1080, 1x, rotação 0, SDR

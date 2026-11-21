@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Profile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Name>Mac (nativo)</Name>
   <Id>macnativo0000000000000000000001</Id>
@@ -17,7 +17,7 @@
       <RedGain>51</RedGain>
       <GreenGain>53</GreenGain>
       <BlueGain>68</BlueGain>
-      <Gamma>0.81</Gamma>
+      <Gamma>1</Gamma>
       <BrightMult>1</BrightMult>
       <BlackLift>0</BlackLift>
       <GainR>1</GainR>
@@ -26,6 +26,7 @@
       <Temp>0</Temp>
       <Tint>0</Tint>
       <Saturation>-1</Saturation>
+      <GpuSaturation>110</GpuSaturation>
       <Largura>1920</Largura>
       <Altura>1080</Altura>
       <TaxaHz>144</TaxaHz>
@@ -58,7 +59,7 @@
       <RedGain>50</RedGain>
       <GreenGain>50</GreenGain>
       <BlueGain>50</BlueGain>
-      <Gamma>0.81</Gamma>
+      <Gamma>1</Gamma>
       <BrightMult>1</BrightMult>
       <BlackLift>0</BlackLift>
       <GainR>1</GainR>
@@ -67,6 +68,7 @@
       <Temp>0</Temp>
       <Tint>0</Tint>
       <Saturation>-1</Saturation>
+      <GpuSaturation>110</GpuSaturation>
       <Largura>1920</Largura>
       <Altura>1080</Altura>
       <TaxaHz>100</TaxaHz>

@@ -60,6 +60,36 @@ namespace ColorMatch
             return l;
         }
 
+        // perfis de cor que acompanham o app (curvas extraídas dos ICCs stock)
+        public static List<IccPerfil> Embutidos()
+        {
+            var l = new List<IccPerfil>();
+            AddE(l, "ACES CG Linear (AP1)", 0.45, "γ1.00 · linear (escurece)");
+            AddE(l, "Adobe RGB (1998)", 0.99, "γ2.20");
+            AddE(l, "DCI-P3 (SMPTE RP 431-2)", 1.18, "γ2.60");
+            AddE(l, "Display P3", 1.01, "γ2.22");
+            AddE(l, "Generic Gray Gamma 2.2", 1.01, "γ2.22");
+            AddE(l, "Generic Gray Profile", 0.81, "γ1.80");
+            AddE(l, "Generic RGB Profile", 0.81, "γ1.80");
+            AddE(l, "Rec. 2020 (BT.2020)", 0.87, "γ1.94");
+            AddE(l, "Rec. 709 (BT.709)", 0.87, "γ1.95");
+            AddE(l, "ROMM RGB (ProPhoto)", 0.81, "γ1.80");
+            AddE(l, "sRGB IEC61966-2.1", 1.01, "γ2.22");
+            return l;
+        }
+
+        static void AddE(List<IccPerfil> l, string nome, double gamma, string detalhe)
+        {
+            var p = new IccPerfil();
+            p.Nome = nome;
+            p.Gamma = gamma;
+            p.BrightMult = 1.0;
+            p.BlackLift = 0.0;
+            p.GainR = 1.0; p.GainG = 1.0; p.GainB = 1.0;
+            p.Detalhe = detalhe;
+            l.Add(p);
+        }
+
         // copia para a pasta do app (sobrescreve se já existir um com o mesmo nome)
         public static string Importar(string origem)
         {

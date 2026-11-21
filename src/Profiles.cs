@@ -41,6 +41,7 @@ namespace ColorMatch
         public double Temp = 0.0;       // -1 frio (azul) .. +1 quente (vermelho)
         public double Tint = 0.0;       // -1 verde .. +1 magenta
         public int Saturation = -1;     // DDC VCP 0x8A; -1 = não aplicado / sem suporte
+        public int GpuSaturation = -1;  // saturação do driver AMD (ADLX); 100 = neutro; -1 = não mexe
 
         // modo de tela (0 = não mexer)
         public int Largura = 0;
@@ -78,6 +79,7 @@ namespace ColorMatch
             Gamma = c.Gamma; BrightMult = c.BrightMult; BlackLift = c.BlackLift;
             GainR = c.GainR; GainG = c.GainG; GainB = c.GainB;
             Temp = c.Temp; Tint = c.Tint; Saturation = c.Saturation;
+            GpuSaturation = c.GpuSaturation;
             Largura = c.Largura; Altura = c.Altura; TaxaHz = c.TaxaHz;
             Extras = new List<VcpValor>();
             if (c.Extras != null)

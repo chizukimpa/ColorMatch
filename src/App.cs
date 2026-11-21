@@ -14,7 +14,7 @@ namespace ColorMatch
     static class Program
     {
         // versão publicada (SemVer): 1.0.x = correções, 1.x.0 = recursos novos
-        public const string Versao = "1.5.0";
+        public const string Versao = "1.7.0";
 
         [STAThread]
         static void Main(string[] args)
@@ -118,6 +118,7 @@ namespace ColorMatch
                 {
                     Win.ApplyMode(ds.DeviceName, c.Largura, c.Altura, c.TaxaHz);
                     Win.ApplyExtras(ds.PhysicalHandle, c.Extras);
+                    Adlx.Aplicar(ds.FriendlyName, c.GpuSaturation);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BRIGHTNESS, (uint)c.Brightness);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_CONTRAST, (uint)c.Contrast);
                     Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
@@ -140,6 +141,7 @@ namespace ColorMatch
                 var c = ds.Cal != null ? ds.Cal : prof.GetByMonitorId(ds.MonitorId, ds.DeviceName);
                 Win.ApplyMode(ds.DeviceName, c.Largura, c.Altura, c.TaxaHz);
                 Win.ApplyExtras(ds.PhysicalHandle, c.Extras);
+                Adlx.Aplicar(ds.FriendlyName, c.GpuSaturation);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_BRIGHTNESS, (uint)c.Brightness);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_CONTRAST, (uint)c.Contrast);
                 Win.WriteVCP(ds.PhysicalHandle, Win.VCP_RED_GAIN, (uint)c.RedGain);
@@ -391,9 +393,18 @@ namespace ColorMatch
         public void Edicao() { if (_owner != null) _owner.EditouPerfil(this); }
         public void AvisarMudanca() { if (_owner != null) _owner.ProfileChanged(); }
 
-        // saturação do monitor via DDC/CI (VCP 0x8A), quando o monitor suporta
+        // saturação: primeiro tenta o driver AMD (ADLX), depois o DDC 0x8A do monitor
+        public bool SatGpu;
         public bool SaturacaoDisponivel(out int valor, out int max)
         {
+            valor = 0; max = 0;
+            int mn;
+            if (Adlx.Ler(Display.FriendlyName, out valor, out mn, out max))
+            {
+                SatGpu = true;
+                return true;
+            }
+            SatGpu = false;
             uint cur, mx;
             bool ok = Win.ReadVCP(H(), 0x8A, out cur, out mx);
             valor = (int)cur;
@@ -404,6 +415,14 @@ namespace ColorMatch
         public void DefinirSaturacao(int v)
         {
             if (_owner != null) _owner.EditouPerfil(this);
+            if (SatGpu)
+            {
+                Adlx.Definir(Display.FriendlyName, v);
+                Cal.GpuSaturation = v;
+                if (_st != null) _st.Text = "Saturação (GPU AMD): " + v + ".";
+                if (_owner != null) _owner.ProfileChanged();
+                return;
+            }
             Cal.Saturation = v;
             Win.WriteVCP(H(), 0x8A, (uint)v);
             if (_st != null) _st.Text = "Saturação (DDC): " + v + ".";
@@ -1505,6 +1524,7 @@ namespace ColorMatch
                             try
                             {
                                 alvo.SyncSliders();
+                                Adlx.Aplicar(alvo.Display.FriendlyName, alvo.Cal.GpuSaturation);
                                 var ent = MonitorDb.PorChave(Profile.HardwareKey(alvo.Display.MonitorId));
                                 if (ent != null) alvo.AplicarSuporte(ent);
                                 alvo.MostrarAvisoDdc();
@@ -1852,6 +1872,7 @@ namespace ColorMatch
                 var c = src.Match(p.Display.MonitorId, p.Display.DeviceName);
                 if (c == null) { faltando++; continue; }
                 Win.ApplyMode(p.Display.DeviceName, c.Largura, c.Altura, c.TaxaHz);
+                Adlx.Aplicar(p.Display.FriendlyName, c.GpuSaturation);
                 p.Cal.CopyValuesFrom(c);
                 p.SyncSliders();
                 p.LimparPreset();
@@ -1906,6 +1927,17 @@ namespace ColorMatch
                 m.Items.Add(it);
             }
 
+            var iccMenu = item("Perfis de cor (ICC)");
+            foreach (var ic in Icc.Embutidos())
+            {
+                var it = item(ic.Nome + "   ·   " + ic.Detalhe);
+                if (("ICC: " + ic.Nome) == mp.PresetAtual) it.Font = new Font(m.Font, FontStyle.Bold);
+                var perfilIcc = ic;
+                var painelIcc = mp;
+                it.Click += (s, e) => AplicarIccEm(painelIcc, perfilIcc);
+                iccMenu.DropDownItems.Add(it);
+            }
+            m.Items.Add(iccMenu);
             m.Items.Add(new ToolStripSeparator());
 
             var cabIcc = item("PERFIS ICC IMPORTADOS");

@@ -2,7 +2,7 @@
 
 > Iguala cor e brilho entre monitores no Windows.
 
-**Versão atual: 1.5.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
+**Versão atual: 1.7.0** — cada correção sobe `1.0.x`; cada recurso novo sobe `1.x.0`.
 
 ## Sobre
 
@@ -51,6 +51,15 @@ Desenvolvido para rodar **100% invisível** (sem ícone na bandeja) e **sem UAC/
   uma cópia (**"nome (editado)"**); o original nunca é sobrescrito.
 - **Abertura instantânea**: o DDC/CI é lido em segundo plano depois que a janela aparece
   (monitor lento não segura mais a abertura).
+- **Saturação pela GPU (AMD ADLX)**: o app fala direto com a ADLX do driver AMD e controla a
+  saturação por monitor — a mesma alavanca do Adrenalin. Fica em **Filtro de cor → Saturação
+  (GPU AMD)** (100 = neutro; 200 = máxima), fica salva no perfil e é reaplicada no startup.
+  O DDC 0x8A continua como plano B quando o monitor expõe.
+- **Perfis de cor (ICC) embutidos**: na lista de cada cartão, em **Perfis de cor (ICC)**:
+  ACES CG Linear (AP1), Adobe RGB (1998), DCI-P3 (SMPTE RP 431-2), Display P3, Generic Gray
+  Gamma 2.2, Generic Gray Profile, Generic RGB Profile, Rec. 2020, Rec. 709, ROMM RGB
+  (ProPhoto) e sRGB IEC61966-2.1. Aplicam a curva/TRC do ICC (as primárias não são
+  reproduzíveis por LUT). CMYK/Lab/XYZ ficam de fora (não são perfis de saída RGB).
 - **Reordenar cartões** arrastando o cabeçalho; a ordem fica salva no perfil.
 - **Iniciar com o Windows**: entrada em `HKCU\...\Run` com `/invisivel`, sem UAC, e
   reparada automaticamente se sumir (flag `AutoStart` no perfil).
@@ -169,6 +178,12 @@ Os valores de calibração (brilho, contraste, ganhos, gamma, realce) ficam no
 
 ## Histórico
 
+- **1.7.0** — perfis de cor **ICC embutidos** (ACES CG Linear, Adobe RGB, DCI-P3, Display P3,
+  Generic Gray 2.2, Generic Gray, Generic RGB, Rec. 2020, Rec. 709, ROMM/ProPhoto e sRGB) na
+  lista de cada cartão; tema **"Mac (nativo)"** com **Gamma 1,00** (mesma luz do macOS num
+  painel ~γ2.2; o 0,81 escurecia demais).
+- **1.6.0** — **saturação pela GPU (AMD ADLX)** por monitor, com slider em **Filtro de cor**
+  (100 = neutro, 200 = máxima), salva no perfil e reaplicada no startup; DDC 0x8A como fallback.
 - **1.5.0** — tema embutido **"Mac (nativo)"**: captura do visual do macOS 26.7 nos dois
   monitores (perfil Generic RGB γ1.80 + LUT identidade) traduzida para o app — Gamma 0,81
   (cinza 50% = 0,427) e o DDC/OSD que já estava gravado neles (AOC 62/54 ganhos 51/53/68;

@@ -494,7 +494,7 @@ namespace ColorMatch
     {
         MonitorPanel _mp;
         ModernSlider _temp, _tint, _sat;
-        Label _lblTemp, _lblTint, _lblSat, _satInfo;
+        Label _lblTemp, _lblTint, _lblSat, _satInfo, _satTitulo;
         bool _carregando = true;
         bool _satOk;
         int _satMax = 100;
@@ -524,7 +524,7 @@ namespace ColorMatch
             Small("Verde", 20, 158);
             SmallRight("Magenta", 20, 158);
 
-            Lbl("Saturação (DDC/CI)", 20, 190, Theme.Text);
+            _satTitulo = Lbl("Saturação", 20, 190, Theme.Text);
             _lblSat = Lbl("", 250, 190, Theme.Muted);
             _lblSat.TextAlign = ContentAlignment.TopRight;
             _sat = Slider(20, 214, 0, 100, 50);
@@ -544,11 +544,16 @@ namespace ColorMatch
             _sat.Maximum = _satMax;
             if (_satOk)
             {
-                int atual = mp.Cal.Saturation >= 0 ? mp.Cal.Saturation : v;
+                int atual = mp.SatGpu
+                    ? (mp.Cal.GpuSaturation >= 0 ? mp.Cal.GpuSaturation : v)
+                    : (mp.Cal.Saturation >= 0 ? mp.Cal.Saturation : v);
                 if (atual < 0) atual = 0;
                 if (atual > _satMax) atual = _satMax;
                 _sat.Value = atual;
-                _satInfo.Text = "Saturação do próprio monitor via DDC/CI (VCP 0x8A).";
+                _satTitulo.Text = mp.SatGpu ? "Saturação (GPU AMD)" : "Saturação (DDC/CI)";
+                _satInfo.Text = mp.SatGpu
+                    ? "Saturação do driver AMD (ADLX). 100 = neutro; 200 = máxima."
+                    : "Saturação do próprio monitor via DDC/CI (VCP 0x8A).";
             }
             else
             {
